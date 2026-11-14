@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Launch window before Android 12: the theme's background with the glass logo in the middle.
+     splash_logo has a night variant, so this follows dark mode too. -->
+<layer-list xmlns:android="http://schemas.android.com/apk/res/android">
+    <item android:drawable="@color/ez_window_background" />
+    <item android:drawable="@drawable/splash_logo" android:gravity="center" android:width="200dp" android:height="200dp" />
+</layer-list>

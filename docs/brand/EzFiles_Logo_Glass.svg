@@ -1,0 +1,42 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 330 293" width="990" height="879">
+<title>EzFiles — glossy vector icon</title>
+<desc>Editable reconstruction of the EzFiles layered document icon, pink glass tile, orbit, and sparkle.</desc>
+<defs>
+ <linearGradient id="tile" x1="0" y1="0" x2=".85" y2="1" gradientUnits="objectBoundingBox"><stop stop-color="#fff9ff"/><stop offset=".18" stop-color="#ffafc8"/><stop offset=".46" stop-color="#ff3c76"/><stop offset=".76" stop-color="#eb4b96"/><stop offset="1" stop-color="#ffc8e4"/></linearGradient>
+ <radialGradient id="glow" cx=".42" cy=".15" r=".9"><stop stop-color="#fff" stop-opacity=".95"/><stop offset=".34" stop-color="#ffdae9" stop-opacity=".3"/><stop offset="1" stop-color="#fff" stop-opacity="0"/></radialGradient>
+ <linearGradient id="paper" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#fff"/><stop offset=".52" stop-color="#fff6fb"/><stop offset="1" stop-color="#ffd6e9"/></linearGradient>
+ <linearGradient id="paperSide" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#fff7fe"/><stop offset=".55" stop-color="#ffb7d6"/><stop offset="1" stop-color="#f980b0"/></linearGradient>
+ <linearGradient id="brand" x1="0" y1="0" x2=".9" y2="1"><stop stop-color="#ff596d"/><stop offset=".55" stop-color="#f32557"/><stop offset="1" stop-color="#d90643"/></linearGradient>
+ <linearGradient id="orb" x1="0" y1="0" x2=".85" y2="1"><stop stop-color="#fff" stop-opacity=".15"/><stop offset=".35" stop-color="#fff" stop-opacity=".95"/><stop offset=".72" stop-color="#fff" stop-opacity=".7"/><stop offset="1" stop-color="#fff" stop-opacity=".15"/></linearGradient>
+ <linearGradient id="fold" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#fff"/><stop offset="1" stop-color="#ffc8e0"/></linearGradient>
+ <filter id="tileShadow" x="-25%" y="-25%" width="150%" height="160%"><feGaussianBlur stdDeviation="7"/></filter>
+ <filter id="softShadow" x="-35%" y="-35%" width="170%" height="180%"><feGaussianBlur stdDeviation="4"/></filter>
+</defs>
+<!-- The icon canvas is transparent: no raster image is embedded. -->
+<rect x="35" y="27" width="252" height="246" rx="65" fill="#d52068" opacity=".24" filter="url(#tileShadow)"/>
+<rect x="29" y="21" width="257" height="251" rx="69" fill="url(#tile)" stroke="#fff7fd" stroke-width="2.3"/>
+<rect x="32" y="24" width="251" height="245" rx="66" fill="url(#glow)"/>
+<!-- translucent paper stack -->
+<path d="M78 91 Q52 88 53 111 L68 220 Q73 241 94 233 L164 215 L139 79Z" fill="url(#paperSide)" stroke="#fff2fa" stroke-width="1.5"/>
+<path d="M97 69 Q77 65 76 86 L85 219 Q87 239 106 240 L192 230 L167 69Z" fill="url(#paperSide)" stroke="#fff7fe" stroke-width="1.7"/>
+<!-- orbit ribbon wraps behind the main sheet -->
+<path d="M83 173 C30 188 29 220 64 226 C118 251 234 211 271 150 C297 109 284 95 259 92" fill="none" stroke="#fff4fc" stroke-width="10" opacity=".3" filter="url(#softShadow)"/>
+<path d="M83 173 C30 188 29 220 64 226 C118 251 234 211 271 150 C297 109 284 95 259 92" fill="none" stroke="url(#orb)" stroke-width="5" stroke-linecap="round"/>
+<!-- main page shadow -->
+<path d="M128 49 H189 Q200 49 208 57 L239 90 Q249 99 249 111 V217 Q249 243 227 244 H125 Q102 244 102 220 V72 Q102 49 128 49Z" fill="#d82877" opacity=".23" filter="url(#softShadow)"/>
+<!-- main page -->
+<path d="M128 47 H184 Q199 47 208 56 L239 87 Q248 96 248 110 V218 Q248 243 222 243 H128 Q103 243 103 217 V73 Q103 47 128 47Z" fill="url(#paper)" stroke="#fff" stroke-width="2.2"/>
+<!-- folded corner -->
+<path d="M195 51 V77 Q195 97 215 97 H245 Q240 89 234 83 L207 57 Q201 52 195 51Z" fill="url(#fold)" stroke="#fff9ff" stroke-width="1.5"/>
+<!-- document lines -->
+<rect x="123" y="74" width="61" height="8.5" rx="4.25" fill="#fb9cbe"/>
+<rect x="123" y="91" width="51" height="8.5" rx="4.25" fill="#fba9c7"/>
+<!-- emblem E / abstract folded paper: three red smooth bands -->
+<path d="M116 188 C119 154 133 117 164 117 H217 L210 131 Q205 142 191 142 H157 Q144 142 137 158 L127 183 C139 163 150 161 167 161 H206 L197 177 Q193 184 181 184 H155 Q145 184 139 197 L127 224 H118 Q109 224 116 188Z" fill="url(#brand)"/>
+<path d="M131 210 Q142 201 158 201 H223 L212 216 Q208 227 194 227 H126Z" fill="url(#brand)"/>
+<!-- glass rim and foreground highlight -->
+<path d="M44 82 Q47 40 96 32" fill="none" stroke="#fff" stroke-width="4" opacity=".56" stroke-linecap="round"/>
+<path d="M46 218 Q58 258 96 260 H228" fill="none" stroke="#fff" stroke-width="2.5" opacity=".44" stroke-linecap="round"/>
+<!-- sparkle -->
+<path d="M254 57 Q257 69 267 70 Q257 73 254 84 Q251 73 241 70 Q251 67 254 57Z" fill="#fff"/>
+</svg>

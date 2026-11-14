@@ -1,0 +1,45 @@
+# Gradle, Kotlin, and Android build output
+.gradle/
+build/
+local.properties
+.kotlin/
+.cxx/
+.externalNativeBuild/
+captures/
+*.apk
+*.aab
+*.hprof
+
+# IDE settings
+.idea/
+*.iml
+
+# Rust build output (keep Cargo.lock tracked)
+**/target/
+
+# XcodeGen output and local Xcode state
+iosApp/*.xcodeproj
+xcuserdata/
+*.xcuserstate
+DerivedData/
+
+# OS metadata
+.DS_Store
+Thumbs.db
+Desktop.ini
+
+# Signing keys
+*.jks
+*.keystore
+
+.claude/
+# Agent worktrees
+.claude/worktrees/
+ezjks
+/androidApp/release
+
+# Owner-provided Firebase Android client configuration
+/androidApp/google-services.json
+
+# Local Fily datasets, Python environment, model weights and checkpoints
+/training/

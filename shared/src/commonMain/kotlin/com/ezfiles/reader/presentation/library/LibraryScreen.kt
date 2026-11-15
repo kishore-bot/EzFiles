@@ -86,6 +86,10 @@ import com.ezfiles.reader.presentation.theme.glass
 import com.ezfiles.reader.presentation.theme.libraryBackground
 import com.ezfiles.reader.presentation.theme.appSafeArea
 import com.ezfiles.reader.presentation.theme.pressScale
+import com.ezfiles.reader.presentation.assistant.VoiceAssistantSheet
+import com.ezfiles.reader.application.assistant.ConversationManager
+import com.ezfiles.reader.application.assistant.ModelManager
+import com.ezfiles.reader.platform.rememberMicPermission
 
 @Composable
 fun LibraryScreen(
@@ -96,6 +100,7 @@ fun LibraryScreen(
     /** The menu button (top left): the app opens its drawer. */
     /** The info button (top right); null hides it. */
     onOpenAbout: (() -> Unit)? = null,
+    modelManager: ModelManager? = null,
     /** The Bookmarks tab's content; null shows a short explanation instead. */
     bookmarksContent: (@Composable () -> Unit)? = null,
     /** A file found by its text, with the PDF page (from 0) the match is on, if known. */
@@ -126,6 +131,7 @@ fun LibraryScreen(
         onRemoveFolder = viewModel::removeFolder,
         onAddFolderFailureSeen = viewModel::onAddFolderFailureSeen,
         onOpenAbout = onOpenAbout,
+        modelManager = modelManager,
         bookmarksContent = bookmarksContent,
         onOpenHit = { onOpenHit(it.item.ref, it.page) },
         searchInput = searchInput,
@@ -149,6 +155,7 @@ fun LibraryScreen(
     onRemoveFolder: (String) -> Unit,
     onAddFolderFailureSeen: () -> Unit,
     onOpenAbout: (() -> Unit)? = null,
+    modelManager: ModelManager? = null,
     bookmarksContent: (@Composable () -> Unit)? = null,
     onOpenHit: (ContentItem) -> Unit = { onOpen(it.item.ref) },
     searchInput: String = state.query,
@@ -180,6 +187,9 @@ fun LibraryScreen(
     var explainingAddFolder by rememberSaveable { mutableStateOf(false) }
     var removingFolder by rememberSaveable { mutableStateOf<String?>(null) }
     var confirmingClear by rememberSaveable { mutableStateOf(false) }
+    var voiceOpen by rememberSaveable { mutableStateOf(false) }
+    val micPermission = rememberMicPermission { granted -> if (granted) voiceOpen = true }
+    val openVoice = { if (micPermission.granted) voiceOpen = true else micPermission.request() }
     val askToClear = { confirmingClear = true }
     val noFolders = state.folders.isEmpty()
     // Typing shows two sections: matching names, then matching text.
@@ -190,7 +200,7 @@ fun LibraryScreen(
         .imePadding()) {
         if (tab == HomeTab.Bookmarks) {
             Column(Modifier.fillMaxSize().statusBarsPadding().padding(start = startClearance, bottom = if (landscape) 0.dp else bottomClearance - 72.dp)) {
-                Header(onOpenAbout.takeUnless { landscape }, compact = landscape)
+                Header(onOpenAbout.takeUnless { landscape }, onVoice = openVoice.takeIf { modelManager != null }, compact = landscape)
                 Box(Modifier.weight(1f).fillMaxWidth()) {
                     if (bookmarksContent != null) {
                         bookmarksContent()
@@ -205,7 +215,7 @@ fun LibraryScreen(
             verticalArrangement = Arrangement.spacedBy(if (landscape) 4.dp else 8.dp),
         ) {
             if (!landscape) item(key = "header", contentType = "header") {
-                Header(onOpenAbout, compact = landscape)
+                Header(onOpenAbout, onVoice = openVoice.takeIf { modelManager != null }, compact = landscape)
             }
             item(key = "search", contentType = "search") {
                 SearchField(searchInput, onQueryChange, Modifier.padding(horizontal = EzSpacing.Gutter, vertical = 4.dp), compact = landscape)
@@ -407,6 +417,17 @@ fun LibraryScreen(
             dismissButton = { EzTextButton("Cancel", { confirmingClear = false }, color = EzColors.TextSecondary) },
         )
     }
+    if (voiceOpen && modelManager != null) {
+        val conversation = remember { ConversationManager() }
+        VoiceAssistantSheet(
+            onDismiss = {
+                voiceOpen = false
+                conversation.clear()
+            },
+            modelManager = modelManager,
+            conversation = conversation,
+        )
+    }
     if (state.addFolderFailed) {
         EzDialog(
             onDismissRequest = onAddFolderFailureSeen,
@@ -537,7 +558,7 @@ private fun SectionTitle(title: String, count: String?, busy: Boolean = false, o
 
 /** Menu, the app's name, and About (when there is one). */
 @Composable
-private fun Header(onOpenAbout: (() -> Unit)?, compact: Boolean = false) {
+private fun Header(onOpenAbout: (() -> Unit)?, onVoice: (() -> Unit)? = null, compact: Boolean = false) {
     Row(
         Modifier.fillMaxWidth().padding(start = EzSpacing.Gutter, end = EzSpacing.Gutter, top = if (compact) 4.dp else 12.dp, bottom = if (compact) 2.dp else 6.dp),
         verticalAlignment = Alignment.CenterVertically,
@@ -549,6 +570,7 @@ private fun Header(onOpenAbout: (() -> Unit)?, compact: Boolean = false) {
             color = EzColors.Text,
             modifier = Modifier.weight(1f).semantics { heading() },
         )
+        if (onVoice != null) GlassIconButton(EzIcons.Mic, "Voice assistant", onVoice)
         if (onOpenAbout != null) GlassIconButton(EzIcons.Info, "About EzFiles", onOpenAbout)
     }
 }

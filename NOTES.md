@@ -1182,3 +1182,26 @@ The first two are [documented AGP migration opt-outs](https://developer.android.
 - Goal: Provide step-by-step PowerShell commands for the already running job. Read current job/status instructions and checked the supervisor; PID 16700 was alive and training had reached step 200 with approximately 17,654 seconds remaining.
 - Decision: Owner should monitor the existing run rather than launch another. Commands use the venv Python directly, so activation is unnecessary; live metrics, final reports/exports and failure-only resume instructions were provided.
 - Files touched: NOTES.md only. Validation: live status/PID check; no app code, training parameters or worker state changed. Next: let the existing job and automatic post-processing finish.
+
+
+## Automated five-hour Fily completion: 2026-11-14T18:03:36.666592+00:00
+
+- Goal: owner-authorized five-hour local GPU training on expanded app/edge curriculum; no app source edits.
+- Result: 9672 optimizer steps, 18040.5 elapsed seconds; selected runs\fily-edge-v5-5h\checkpoint-003102 by fixed validation loss.
+- Outputs: runs/fily-edge-v5-5h/completed.json and RUN_REPORT.md; exports/fily-edge-v5-5h contains merged/quantized models, calibration, evaluations and isolated benchmarks.
+- Commands: training/run_five_hour.py; train_long.py; export_quantized.py; calibrate_quantization.py; evaluate_gguf.py; bench_quantized.py, exact arguments in worker logs.
+- Scope: local synthetic model work only; no tool actions executed, app/device/voice acceptance or production guarantee.
+- Next: review the raw evaluation failures and benchmark/quantization tradeoffs before integrating or promoting a model.
+
+
+## 2026-11-15: Five-hour completion review
+
+- Verified supervisor completed and exited; training ran 9,672 optimizer steps over 18,040.5 seconds. Best validation checkpoint was step 3,102 (loss 0.0061148); final loss 0.0091588, so the earlier best was exported.
+- Held-out synthetic edge sample: Q8 exact tool outputs improved from baseline 60/66 to 66/66 (127/128 strict overall, 128/128 contract valid); calibrated Q4 reached 65/66 (118/128 strict). Capability retention still has issues: Q8 12/14 exact format lists and Q4 10/14; action checks there were 10/10 and 9/10 respectively. Do not imply broad human or app/device acceptance.
+- Exports, calibration, evaluations and benchmarks completed under training/exports/fily-edge-v5-5h. Q8 is 379.22 MB at 108.5 generated tokens/s; calibrated Q4 is 229.31 MB at 173.4 tokens/s in the local four-thread CPU benchmark. App integration and independent voice/phone testing remain pending.
+- Files touched by review: NOTES.md only. No training restart, app change, model promotion, staging or push.
+
+## 2026-11-15: Fily integration reverted at owner request
+- Removed this integration's native runtime, model import/chat/speech code, assets and tests; restored the six edited app/build files. Stopped its isolated emulator and dedicated ADB server. Earlier notes, ignored training data and trained exports were preserved.
+- Verification: git status/diff after rollback; no integration source remains. App/device acceptance was unfinished when cancelled. Next steps: none; integration cancelled by owner.
+

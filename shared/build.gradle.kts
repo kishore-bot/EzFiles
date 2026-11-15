@@ -73,6 +73,21 @@ android {
         // 64-bit devices and the x86_64 emulator. Add armeabi-v7a only if
         // 32-bit devices matter; each ABI adds a full copy of the engine.
         ndk.abiFilters += setOf("arm64-v8a", "x86_64")
+        externalNativeBuild {
+            cmake {
+                arguments += listOf(
+                    "-DGGML_VULKAN=ON",
+                    "-DLLAMA_BUILD_TESTS=OFF",
+                    "-DLLAMA_BUILD_EXAMPLES=OFF",
+                    "-DLLAMA_BUILD_SERVER=OFF",
+                )
+            }
+        }
+    }
+    externalNativeBuild {
+        cmake {
+            path = file("src/androidMain/cpp/CMakeLists.txt")
+        }
     }
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_17

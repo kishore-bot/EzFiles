@@ -163,6 +163,8 @@ class AppDependencies internal constructor(
     /** The reader's "At a glance" sheet; absent where there is no document text. */
     internal val glancer: DocumentGlancer? = null,
     internal val documentEditor: DocumentEditor? = null,
+    internal val modelManager: com.ezfiles.reader.application.assistant.ModelManager? = null,
+    internal val toolExecutor: com.ezfiles.reader.application.assistant.ToolExecutor? = null,
 )
 
 @OptIn(ExperimentalTime::class)
@@ -223,6 +225,28 @@ fun App(
             photoGallery = null
             reader.onAction(ReaderAction.DocumentPicked(openRequest))
             onOpenRequestHandled()
+        }
+    }
+    LaunchedEffect(dependencies.modelManager) {
+        val mm = dependencies.modelManager ?: return@LaunchedEffect
+        if (mm.state.value == com.ezfiles.reader.application.assistant.ModelState.Idle) {
+            mm.load(
+                modelPath = "/data/local/tmp/Fily-EzFiles-350M-Q8_0.gguf",
+                policy = "You are Fily, an English offline file companion. Output exactly one JSON object. Your domain is EzFiles supported files, app features, file requests, document questions and brief friendly conversation. For unrelated requests, briefly explain that you help with files and EzFiles, then invite a file task. Use {\"kind\":\"tool\",\"name\":NAME,\"arguments\":OBJECT} for one permitted action, or {\"kind\":\"reply\",\"text\":TEXT} for a short natural reply, or {\"kind\":\"clarify\",\"text\":QUESTION} when essential information is missing.",
+                // Vulkan hangs or loses the device on Adreno; CPU until a working GPU backend is in.
+                useGpu = false,
+            )
+        }
+    }
+
+    LaunchedEffect(dependencies.modelManager, dependencies.device) {
+        val mm = dependencies.modelManager ?: return@LaunchedEffect
+        dependencies.device.files.collect { files ->
+            val catalog = files.take(30).joinToString("\n") { ref ->
+                val size = ref.sizeBytes?.let { "${it / 1024}KB" } ?: "?"
+                "${ref.displayName} ($size)"
+            }
+            mm.updateFileCatalog(catalog)
         }
     }
 
@@ -438,6 +462,8 @@ fun App(
                                 reader.onAction(ReaderAction.DocumentPicked(it))
                             },
                             onOpenAbout = openAbout,
+                            modelManager = dependencies.modelManager,
+                            toolExecutor = dependencies.toolExecutor,
                             bookmarksContent = bookmarksContent,
                             // A PDF opens at the page the match is on, like a bookmark.
                             onOpenHit = { ref, page ->

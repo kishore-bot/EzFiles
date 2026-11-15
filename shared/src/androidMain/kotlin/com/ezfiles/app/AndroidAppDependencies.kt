@@ -152,6 +152,8 @@ private fun createAndroidAppDependencies(context: Context, assistantAccess: Assi
         sensitiveCheck = SensitiveCheck(documentText, tidyEngine, tidyCache, Dispatchers.IO),
         glancer = DocumentGlancer(documentText, RustGlanceEngine, Dispatchers.Default),
         documentEditor = AndroidDocumentEditor(app),
+        modelManager = com.ezfiles.reader.application.assistant.ModelManager(),
+        toolExecutor = com.ezfiles.reader.application.assistant.ToolExecutor(assistantActions),
     )
 }
 

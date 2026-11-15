@@ -89,6 +89,7 @@ import com.ezfiles.reader.presentation.theme.pressScale
 import com.ezfiles.reader.presentation.assistant.VoiceAssistantSheet
 import com.ezfiles.reader.application.assistant.ConversationManager
 import com.ezfiles.reader.application.assistant.ModelManager
+import com.ezfiles.reader.application.assistant.ToolExecutor
 import com.ezfiles.reader.platform.rememberMicPermission
 
 @Composable
@@ -101,6 +102,7 @@ fun LibraryScreen(
     /** The info button (top right); null hides it. */
     onOpenAbout: (() -> Unit)? = null,
     modelManager: ModelManager? = null,
+    toolExecutor: ToolExecutor? = null,
     /** The Bookmarks tab's content; null shows a short explanation instead. */
     bookmarksContent: (@Composable () -> Unit)? = null,
     /** A file found by its text, with the PDF page (from 0) the match is on, if known. */
@@ -132,6 +134,7 @@ fun LibraryScreen(
         onAddFolderFailureSeen = viewModel::onAddFolderFailureSeen,
         onOpenAbout = onOpenAbout,
         modelManager = modelManager,
+        toolExecutor = toolExecutor,
         bookmarksContent = bookmarksContent,
         onOpenHit = { onOpenHit(it.item.ref, it.page) },
         searchInput = searchInput,
@@ -156,6 +159,7 @@ fun LibraryScreen(
     onAddFolderFailureSeen: () -> Unit,
     onOpenAbout: (() -> Unit)? = null,
     modelManager: ModelManager? = null,
+    toolExecutor: ToolExecutor? = null,
     bookmarksContent: (@Composable () -> Unit)? = null,
     onOpenHit: (ContentItem) -> Unit = { onOpen(it.item.ref) },
     searchInput: String = state.query,
@@ -426,6 +430,8 @@ fun LibraryScreen(
             },
             modelManager = modelManager,
             conversation = conversation,
+            toolExecutor = toolExecutor,
+            onNavigate = { /* TODO: resolve documentId and open */ },
         )
     }
     if (state.addFolderFailed) {

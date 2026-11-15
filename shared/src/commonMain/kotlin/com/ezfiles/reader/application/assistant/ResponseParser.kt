@@ -41,7 +41,7 @@ fun parseModelResponse(raw: String): ModelResponse {
 }
 
 fun spokenTextFor(response: ModelResponse): String = when (response.kind) {
-    "tool" -> "Done. ${response.toolName ?: ""}"
+    "tool" -> "Let me check."
     "clarify" -> response.text ?: "Could you say more?"
     else -> response.text ?: "I'm not sure what to say."
 }

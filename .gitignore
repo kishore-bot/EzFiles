@@ -32,6 +32,11 @@ Desktop.ini
 *.jks
 *.keystore
 
+# Third-party headers and host tools fetched for the native GPU build
+engine/SPIRV-Headers/
+engine/Vulkan-Headers/
+engine/vulkan-shaders-gen-build/
+
 .claude/
 # Agent worktrees
 .claude/worktrees/

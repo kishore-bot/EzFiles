@@ -19,7 +19,7 @@ camerax = "1.6.2"
 mlkit-text-recognition = "16.0.1"
 android-compileSdk = "37"
 android-targetSdk = "37"
-android-minSdk = "26"
+android-minSdk = "30"
 android-ndk = "29.0.14206865"
 # Baseline Profile generation and startup benchmarks (:baselineprofile). Needs AGP 8.0+.
 androidx-benchmark = "1.4.1"

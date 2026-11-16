@@ -1,5 +1,7 @@
 package com.ezfiles.reader.application.assistant
 
+import com.ezfiles.reader.domain.spokenNumber
+
 data class QuickCommand(val operation: String, val value: String? = null)
 
 /**
@@ -51,6 +53,34 @@ object QuickCommands {
             text.matches(Regex("""^(pause|stop)( it| this| the (video|song|audio|track)| playback)?$""")) -> pick("pause")
             else -> null
         }
+    }
+
+    private val ordinals = listOf("first", "second", "third", "fourth", "fifth", "sixth", "seventh", "eighth", "ninth", "tenth")
+    private val ordinalRequest = Regex(
+        """^(open|show|show me|play|read) (up )?(the )?(?:(\w+) )?(first|second|third|fourth|fifth|sixth|seventh|eighth|ninth|tenth|last|top|\d+(?:st|nd|rd|th)|number (\w+))\b(.*)$""",
+    )
+    private val listWords = Regex("""\b(file|files|one|document|doc|item|screen|list|result|pdf)\b""")
+
+    /**
+     * "open the first file on screen", "open the second one", "open number 3", "open the last
+     * one": which of the listed files (0-based; -1 for the last), or null. One stray word from the
+     * recognizer is allowed ("open the first file UC on screen"). Pages and slides are not files.
+     */
+    fun listPosition(request: String): Int? {
+        val text = request.lowercase().replace(Regex("""[^a-z0-9 ]"""), " ").replace(Regex(" +"), " ").trim().replace(filler, "").trim()
+        val match = ordinalRequest.find(text) ?: return null
+        val (_, _, _, stray, which, number, rest) = match.destructured
+        if (stray.isNotEmpty() && stray != "very" && stray != "my") return null
+        if (Regex("""\b(page|slide|photo|picture|sheet|cell)\b""").containsMatchIn(rest)) return null
+        val restWords = rest.trim().split(' ').filter(String::isNotEmpty)
+        if (restWords.size > 6 || (restWords.isNotEmpty() && !listWords.containsMatchIn(rest))) return null
+        return when {
+            which == "last" -> -1
+            which == "top" -> 0
+            number.isNotEmpty() -> spokenNumber(number)?.minus(1)
+            which[0].isDigit() -> which.takeWhile(Char::isDigit).toIntOrNull()?.minus(1)
+            else -> ordinals.indexOf(which)
+        }?.takeIf { it >= -1 }
     }
 
     /** What Fily says after a quick command, from the controlReader result. */

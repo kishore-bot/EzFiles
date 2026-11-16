@@ -291,6 +291,14 @@ fun App(
                 { if (micPermission.granted) voiceOpen = true else micPermission.request() }
             } else null
             val openDocument = (state as? ReaderUiState.Ready)?.ref ?: (state as? ReaderUiState.Playing)?.ref
+            // "Open the second file": the list as the library shows it now, read when asked.
+            LaunchedEffect(library) {
+                dependencies.filySession?.listedFiles = {
+                    library.state.value.items.map {
+                        com.ezfiles.reader.application.assistant.ListedFile(dependencies.assistantActions.documentId(it.ref), it.ref.displayName)
+                    }
+                }
+            }
             LaunchedEffect(openDocument) {
                 dependencies.filySession?.openDocumentId = openDocument?.let(dependencies.assistantActions::documentId)
                 // With text access on, read the open file once for Fily, after the viewer has drawn,

@@ -4,6 +4,9 @@ import kotlinx.serialization.json.buildJsonArray
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
 
+/** A file listed on screen: its assistant ID and the name shown. */
+data class ListedFile(val documentId: String, val name: String)
+
 /**
  * One spoken conversation with Fily: the model decides, [ToolExecutor] acts, and the tool's JSON
  * goes back to the model for a grounded reply. Exact screen commands skip the model. Not
@@ -25,6 +28,9 @@ class FilySession(
     /** The assistant ID of the document on screen, set by the UI; null in the library. */
     var openDocumentId: String? = null
 
+    /** The files listed on the library screen, top first, set by the UI: for "open the second file". */
+    var listedFiles: () -> List<ListedFile> = { emptyList() }
+
     /** What is on screen, reported to the model as APP_STATE. */
     val screen: FilyScreen
         get() {
@@ -40,6 +46,10 @@ class FilySession(
     suspend fun ask(request: String): String {
         val screen = screen
         QuickCommands.parse(request, screen.readerCapabilities, screen.pageCount)?.let { return quick(request, it) }
+        if (screen.selectedDocumentId == null) QuickCommands.listPosition(request)?.let { position ->
+            val listed = listedFiles()
+            if (listed.isNotEmpty()) return openListed(request, listed, position)
+        }
         val toolNames = ToolSelector.select(request, screen, tools.supported)
         val system = FilyPrompt.system(toolNames)
         val grammar = FilyGrammar.forTools(toolNames)
@@ -81,6 +91,7 @@ class FilySession(
         val first = alternatives.firstOrNull().orEmpty()
         val screen = screen
         alternatives.firstOrNull { QuickCommands.parse(it, screen.readerCapabilities, screen.pageCount) != null }?.let { return it }
+        if (screen.selectedDocumentId == null) alternatives.firstOrNull { QuickCommands.listPosition(it) != null }?.let { return it }
         val known = if (access.enabled.value) fileWords().map(String::lowercase).toSet() else return first
         val scored = alternatives.map { text -> text to text.lowercase().split(Regex("[^a-z0-9]+")).count { it in known } }
         val best = scored.maxByOrNull { it.second } ?: return first
@@ -123,6 +134,28 @@ class FilySession(
             FilyTurn(FilyRole.Assistant, call.toString()),
             FilyTurn(FilyRole.Tool, outcome.toString()),
             FilyTurn(FilyRole.Assistant, answer.toString()),
+        ))
+        return reply
+    }
+
+    /** "open the second file": opens it directly, recorded as the model would have done it. */
+    private suspend fun openListed(request: String, listed: List<ListedFile>, position: Int): String {
+        val file = (if (position == -1) listed.lastOrNull() else listed.getOrNull(position))
+            ?: return "There ${if (listed.size == 1) "is only 1 file" else "are only ${listed.size} files"} on screen."
+        val args = buildJsonObject { put("documentId", file.documentId) }
+        val result = tools.execute("openDocument", args)
+        val opened = "\"opened\"" in result
+        val reply = if (opened) "Opening ${file.name}." else "I couldn't open ${file.name}."
+        val alias = tools.alias(file.documentId)
+        remember(listOf(
+            FilyTurn(FilyRole.User, request),
+            FilyTurn(FilyRole.Assistant, buildJsonObject {
+                put("kind", "tool"); put("name", "openDocument"); put("arguments", buildJsonObject { put("documentId", alias) })
+            }.toString()),
+            FilyTurn(FilyRole.Tool, result),
+            FilyTurn(FilyRole.Assistant, buildJsonObject {
+                put("kind", "reply"); put("text", reply); put("citations", buildJsonArray { if (opened) add(kotlinx.serialization.json.JsonPrimitive(alias)) })
+            }.toString()),
         ))
         return reply
     }

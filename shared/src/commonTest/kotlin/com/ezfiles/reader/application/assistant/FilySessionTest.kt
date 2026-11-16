@@ -157,6 +157,18 @@ class FilySessionTest {
     }
 
     @Test
+    fun theGuessThatNamesAFileWinsOverTheRecognizersFirstChoice() {
+        val f = FilyFixture(emptyList())
+        val session = FilySession({ "" }, f.tools, f.access, today = { "2026-11-16" },
+            fileNames = { listOf("Kishore_K_CV.pdf", "Budget-2026.xlsx") })
+        assertEquals("open kishore cv", session.bestTranscript(listOf("open kishore csp", "open kishore cv")))
+        assertEquals("hello there", session.bestTranscript(listOf("hello there", "yellow there")))
+        assertTrue("Kishore" in session.speechHints() && "Budget" in session.speechHints() && "2026" !in session.speechHints())
+        f.access.setEnabled(false)
+        assertTrue("Kishore" !in session.speechHints())
+    }
+
+    @Test
     fun isoDatesRoundTrip() {
         val millis = parseIsoDate("2026-11-16")!!
         assertEquals("2026-11-16", isoDate(millis))

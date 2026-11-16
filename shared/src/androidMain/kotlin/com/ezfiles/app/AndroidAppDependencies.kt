@@ -146,6 +146,7 @@ private fun createAndroidAppDependencies(context: Context, assistantAccess: Assi
         assistantAccess,
         today = { java.time.LocalDate.now().toString() },
         reader = readerControl,
+        fileNames = { device.files.value.map { it.displayName } },
     )
     return AppDependencies(
         reader = reader,

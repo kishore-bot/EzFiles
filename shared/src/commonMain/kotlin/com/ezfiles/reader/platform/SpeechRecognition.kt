@@ -11,10 +11,12 @@ expect class SpeechRecognition {
     fun cancel()
 }
 
-expect class SpeechResult(text: String, isFinal: Boolean) {
-    val text: String
-    val isFinal: Boolean
-}
+/** [alternatives] are the recognizer's guesses, best first; [text] is the first. */
+class SpeechResult(val text: String, val isFinal: Boolean, val alternatives: List<String> = listOf(text))
 
+/**
+ * Recognition on the device only. [hints] (file names, command phrases) bias it towards words it
+ * would otherwise mishear; they are given only to an on-device recognizer.
+ */
 @androidx.compose.runtime.Composable
-expect fun rememberSpeechRecognition(onResult: (SpeechResult) -> Unit): SpeechRecognition
+expect fun rememberSpeechRecognition(hints: () -> List<String>, onResult: (SpeechResult) -> Unit): SpeechRecognition

@@ -86,10 +86,10 @@ fun VoiceAssistantSheet(
     val tts = rememberTextToSpeech()
     val ttsState by tts.state.collectAsState()
 
-    val speech = rememberSpeechRecognition { result ->
+    val speech = rememberSpeechRecognition(hints = session::speechHints) { result ->
         partialText = result.text
         if (result.isFinal && result.text.isNotBlank()) {
-            val userText = result.text
+            val userText = session.bestTranscript(result.alternatives)
             partialText = ""
             lastUserText = userText
             lastResponse = ""

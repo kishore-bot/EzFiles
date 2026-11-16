@@ -127,6 +127,20 @@ class AssistantActionsTest {
     }
 
     @Test
+    fun aFileNamedInsteadOfItsIdOpensOnlyWhenOneFileFits() = runTest {
+        val notes = assistantRef(1, "random_notes.txt")
+        val first = assistantRef(2, "report.txt")
+        val second = assistantRef(3, "report.txt")
+        val f = AssistantFixture(listOf(notes, first, second))
+        f.access.setEnabled(true)
+        assertEquals(notes, f.actions.resolveDocument("random_notes.txt"))
+        assertEquals(notes, f.actions.resolveDocument("Random_Notes"))
+        assertEquals(notes, f.actions.resolveDocument("random_note"))
+        assertFailsWith<IllegalArgumentException> { f.actions.resolveDocument("report.txt") }
+        assertFailsWith<IllegalArgumentException> { f.actions.resolveDocument("ra") }
+    }
+
+    @Test
     fun revokedGrantsAndRemovedScopeBlockResultsAndForegroundHandoffs() = runTest {
         val ref = assistantRef(1)
         val f = AssistantFixture(listOf(ref))

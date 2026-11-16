@@ -259,9 +259,31 @@ class AssistantActions internal constructor(
     private suspend fun resolve(snapshot: Snapshot, id: String, token: Long): DocumentRef {
         require(id.length in 1..MAX_ID_CHARS) { "Invalid document identifier." }
         val ref = snapshot.refs.firstOrNull { opaqueId(it) == id }
+            ?: byName(snapshot.refs, id)
             ?: throw IllegalArgumentException("This document is outside the enabled assistant scope or is no longer available.")
         checkStillReadable(ref, token)
         return ref
+    }
+
+    /**
+     * The model sometimes names a file ("random_notes.txt", "random_note") instead of giving its ID.
+     * Accepted only when exactly one file in scope fits: the full name, the name without its extension,
+     * or a name starting with what was said. Never a guess between several files.
+     */
+    private fun byName(refs: List<DocumentRef>, said: String): DocumentRef? {
+        val wanted = said.trim().lowercase()
+        if (wanted.length < 3) return null
+        val stem = { ref: DocumentRef -> ref.displayName.lowercase().substringBeforeLast('.') }
+        for (fits in listOf<(DocumentRef) -> Boolean>(
+            { it.displayName.lowercase() == wanted },
+            { stem(it) == wanted.substringBeforeLast('.') },
+            { stem(it).startsWith(wanted.substringBeforeLast('.')) },
+        )) {
+            val found = refs.filter(fits)
+            if (found.size == 1) return found.single()
+            if (found.size > 1) return null
+        }
+        return null
     }
 
     private suspend fun readable(candidates: List<DocumentRef>, token: Long, limit: Int): Snapshot {

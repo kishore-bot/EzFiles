@@ -138,7 +138,7 @@ class FilySessionTest {
             """{"kind":"tool","name":"searchLibrary","arguments":{"query":"resume","sort":"relevance"}}""",
             """{"kind":"reply","text":"I found resume.pdf.","citations":["id-resume.pdf"]}""",
         ))
-        val session = FilySession({ prompts += it; replies.removeFirst() }, f.tools, f.access, today = { "2026-11-16" })
+        val session = FilySession({ prompt, _ -> prompts += prompt; replies.removeFirst() }, f.tools, f.access, today = { "2026-11-16" })
         assertEquals("I found resume.pdf.", session.ask("find my resume"))
         assertTrue(prompts[1].contains("<|im_start|>tool\n{\"documents\":[{\"id\":\"doc_1\",\"name\":\"resume.pdf\"}],\"partial\":false}<|im_end|>"))
         assertTrue(prompts[1].contains("<|im_start|>assistant\n{\"kind\":\"tool\",\"name\":\"searchLibrary\""))
@@ -151,7 +151,7 @@ class FilySessionTest {
             """{"kind":"tool","name":"openBookmark","arguments":{"bookmarkId":"b"}}""",
             """{"kind":"reply","text":"I can't do that here.","citations":[]}""",
         ))
-        val session = FilySession({ replies.removeFirst() }, f.tools, f.access, today = { "2026-11-16" })
+        val session = FilySession({ _, _ -> replies.removeFirst() }, f.tools, f.access, today = { "2026-11-16" })
         assertEquals("I can't do that here.", session.ask("hello there"))
         assertEquals(null, f.navigation.pending.value)
     }
@@ -159,7 +159,7 @@ class FilySessionTest {
     @Test
     fun theGuessThatNamesAFileWinsOverTheRecognizersFirstChoice() {
         val f = FilyFixture(emptyList())
-        val session = FilySession({ "" }, f.tools, f.access, today = { "2026-11-16" },
+        val session = FilySession({ _, _ -> "" }, f.tools, f.access, today = { "2026-11-16" },
             fileNames = { listOf("Kishore_K_CV.pdf", "Budget-2026.xlsx") })
         assertEquals("open kishore cv", session.bestTranscript(listOf("open kishore csp", "open kishore cv")))
         assertEquals("hello there", session.bestTranscript(listOf("hello there", "yellow there")))

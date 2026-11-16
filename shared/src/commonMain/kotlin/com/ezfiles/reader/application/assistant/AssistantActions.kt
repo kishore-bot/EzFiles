@@ -166,6 +166,16 @@ class AssistantActions internal constructor(
         AssistantExcerpt(metadata(ref), text.orEmpty().take(count), text != null, (text?.length ?: 0) > count)
     }
 
+    /** The passages of a document that best answer [question], within [maxChars]; see [Passages]. */
+    suspend fun getRelevantPassages(documentId: String, question: String, maxChars: Int): AssistantExcerpt = access.authorized(content = true) { token ->
+        val ref = resolve(snapshot(token), documentId, token)
+        val count = maxChars.coerceIn(1, MAX_EXCERPT_CHARS)
+        val text = withTimeoutOrNull(TEXT_TIMEOUT_MS) { documentText.plainText(ref, MAX_SEARCH_CHARS) }
+        checkStillReadable(ref, token)
+        val (selected, partial) = Passages.select(text.orEmpty(), question.take(MAX_QUERY_CHARS), count)
+        AssistantExcerpt(metadata(ref), selected, text != null, partial)
+    }
+
     suspend fun findTextInDocument(documentId: String, query: String, limit: Int = 0): AssistantTextMatches = access.authorized(content = true) { token ->
         require(query.isNotBlank() && query.length <= MAX_QUERY_CHARS) { "Enter between 1 and 256 search characters." }
         val ref = resolve(snapshot(token), documentId, token)

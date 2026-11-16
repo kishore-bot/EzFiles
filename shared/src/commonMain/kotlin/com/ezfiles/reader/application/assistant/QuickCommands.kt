@@ -40,11 +40,12 @@ object QuickCommands {
             text.matches(Regex("""^(show |show me )?(the )?next (photo|picture|image|pic)$""")) -> pick("next_photo")
             text.matches(Regex("""^(show |show me )?(the )?previous (photo|picture|image|pic)$""")) -> pick("previous_photo")
             text.matches(Regex("""^(go )?(next|forward)( one)?$""")) -> pick("next_page", "next_photo")
-            text.matches(Regex("""^(go )?(back|previous)( one)?$""")) -> pick("previous_page", "previous_photo")
+            // A bare "go back" means leaving the file (see isClose); "back one" still turns back.
+            text.matches(Regex("""^previous( one)?$|^(go )?back one$""")) -> pick("previous_page", "previous_photo")
             text.matches(Regex("""^(next|previous) (sheet|tab)$""")) -> pick(if (text.startsWith("next")) "next_sheet" else "previous_sheet")
             text.matches(Regex("""^zoom in( more| a (little|bit))?$|^(make it )?bigger$|^enlarge( it)?$""")) -> pick("zoom_in")
             text.matches(Regex("""^zoom out( more| a (little|bit))?$|^(make it )?smaller$""")) -> pick("zoom_out")
-            text.matches(Regex("""^scroll down( more)?$|^(go )?down$""")) -> pick("scroll_down")
+            text.matches(Regex("""^scroll( down)?( more| a (little|bit))?$|^(go )?down$""")) -> pick("scroll_down")
             text.matches(Regex("""^scroll up( more)?$|^(go )?up$""")) -> pick("scroll_up")
             text.matches(Regex("""^(scroll|go|jump) to (the )?(top|start|beginning)$""")) -> pick("scroll_top")
             text.matches(Regex("""^(scroll|go|jump) to (the )?(bottom|end)$""")) -> pick("scroll_bottom")
@@ -90,6 +91,32 @@ object QuickCommands {
     /** "close", "exit this document", "go back to the library": leave the open file. */
     fun isClose(request: String): Boolean =
         closeRequest.matches(request.lowercase().replace(Regex("""[^a-z0-9 ]"""), " ").replace(Regex(" +"), " ").trim().replace(filler, "").trim())
+
+    private val sections = linkedMapOf(
+        "all" to "all|all files|everything|library|home",
+        "recent" to "recent|recents|recent files|history",
+        "pdf" to "pdf|pdfs",
+        "docs" to "doc|docs|document|documents|word|word files",
+        "slides" to "slide|slides|presentation|presentations|powerpoint|ppt|deck|decks",
+        "sheets" to "sheet|sheets|spreadsheet|spreadsheets|excel",
+        "books" to "book|books|ebook|ebooks|epub",
+        "images" to "image|images|photo|photos|picture|pictures|gallery",
+        "media" to "media|video|videos|audio|music|songs",
+        "text" to "text|text files|notes",
+        "code" to "code|source code|programs",
+        "data" to "data|csv|json",
+        "archives" to "archive|archives|zip|zips|zip files",
+    )
+    private val sectionRequest = Regex(
+        """^(go to|open|show me|show|switch to|take me to)( the| my)? (.+?)( section| tab| category| filter| files| folder)( of the app| in the app)?$""",
+    )
+
+    /** "go to the slides section", "show me the PDF tab": the library filter to show ("slides"), or null. */
+    fun librarySection(request: String): String? {
+        val text = request.lowercase().replace(Regex("""[^a-z0-9 ]"""), " ").replace(Regex(" +"), " ").trim().replace(filler, "").trim()
+        val words = sectionRequest.matchEntire(text)?.groupValues?.get(3) ?: return null
+        return sections.entries.firstOrNull { (_, names) -> words in names.split('|') }?.key
+    }
 
     /** What Fily says after a quick command, from the controlReader result. */
     fun reply(command: QuickCommand, page: Int?, pageCount: Int?, sheet: String?, cell: String?, failure: String?): String {

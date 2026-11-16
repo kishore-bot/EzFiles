@@ -152,6 +152,9 @@ private fun createAndroidAppDependencies(context: Context, assistantAccess: Assi
         today = { java.time.LocalDate.now().toString() },
         reader = readerControl,
         fileNames = { device.files.value.map { it.displayName } },
+        log = if (app.applicationInfo.flags and android.content.pm.ApplicationInfo.FLAG_DEBUGGABLE != 0) {
+            { message -> android.util.Log.i("EzFily", message) }
+        } else { _ -> },
     )
     return AppDependencies(
         reader = reader,

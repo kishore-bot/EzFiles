@@ -10,7 +10,7 @@ data class QuickCommand(val operation: String, val value: String? = null)
  * supports are matched; anything else goes to the model.
  */
 object QuickCommands {
-    private val filler = Regex("""^(hey |ok |okay )?(fily,? )?(please |can you |could you |would you |now )*|( please| now| for me)+$""")
+    private val filler = Regex("""^(i mean |no |hey |ok |okay )*(fily,? )?(please |can you |could you |would you |now |just )*|( please| now| for me)+$""")
 
     fun parse(request: String, operations: Collection<String>, pageCount: Int? = null): QuickCommand? {
         if (operations.isEmpty()) return null
@@ -82,6 +82,14 @@ object QuickCommands {
             else -> ordinals.indexOf(which)
         }?.takeIf { it >= -1 }
     }
+
+    private val closeRequest = Regex(
+        """^(close|exit|quit|leave|shut)( it| this| that)?( (the |this )?(file|document|doc|pdf|book|slides|sheet|video|photo|reader))?$|^(go )?back( to (the |my )?(library|home|files))?$|^go (to the )?home$""",
+    )
+
+    /** "close", "exit this document", "go back to the library": leave the open file. */
+    fun isClose(request: String): Boolean =
+        closeRequest.matches(request.lowercase().replace(Regex("""[^a-z0-9 ]"""), " ").replace(Regex(" +"), " ").trim().replace(filler, "").trim())
 
     /** What Fily says after a quick command, from the controlReader result. */
     fun reply(command: QuickCommand, page: Int?, pageCount: Int?, sheet: String?, cell: String?, failure: String?): String {

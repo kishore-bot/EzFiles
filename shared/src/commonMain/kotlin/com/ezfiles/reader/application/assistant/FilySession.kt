@@ -31,6 +31,9 @@ class FilySession(
     /** The files listed on the library screen, top first, set by the UI: for "open the second file". */
     var listedFiles: () -> List<ListedFile> = { emptyList() }
 
+    /** Leaves the open file as the back button does (unsaved-changes prompt included); set by the UI. */
+    var closeDocument: (() -> Unit)? = null
+
     /** What is on screen, reported to the model as APP_STATE. */
     val screen: FilyScreen
         get() {
@@ -46,6 +49,16 @@ class FilySession(
     suspend fun ask(request: String): String {
         val screen = screen
         QuickCommands.parse(request, screen.readerCapabilities, screen.pageCount)?.let { return quick(request, it) }
+        val close = closeDocument
+        if (close != null && QuickCommands.isClose(request)) {
+            if (screen.selectedDocumentId == null) return "No file is open."
+            close()
+            remember(listOf(
+                FilyTurn(FilyRole.User, request),
+                FilyTurn(FilyRole.Assistant, buildJsonObject { put("kind", "reply"); put("text", "Closed."); put("citations", buildJsonArray { }) }.toString()),
+            ))
+            return "Closed."
+        }
         if (screen.selectedDocumentId == null) QuickCommands.listPosition(request)?.let { position ->
             val listed = listedFiles()
             if (listed.isNotEmpty()) return openListed(request, listed, position)
@@ -92,6 +105,7 @@ class FilySession(
         val screen = screen
         alternatives.firstOrNull { QuickCommands.parse(it, screen.readerCapabilities, screen.pageCount) != null }?.let { return it }
         if (screen.selectedDocumentId == null) alternatives.firstOrNull { QuickCommands.listPosition(it) != null }?.let { return it }
+        if (screen.selectedDocumentId != null) alternatives.firstOrNull(QuickCommands::isClose)?.let { return it }
         val known = if (access.enabled.value) fileWords().map(String::lowercase).toSet() else return first
         val scored = alternatives.map { text -> text to text.lowercase().split(Regex("[^a-z0-9]+")).count { it in known } }
         val best = scored.maxByOrNull { it.second } ?: return first

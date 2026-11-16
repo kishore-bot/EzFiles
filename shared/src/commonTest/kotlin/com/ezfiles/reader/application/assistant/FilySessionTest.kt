@@ -54,6 +54,7 @@ class FilySessionTest {
     fun promptFollowsTheTrainingLayout() {
         val system = FilyPrompt.system(listOf("openDocument"))
         assertTrue(system.startsWith(FilyPrompt.POLICY + "\nTOOLS={\"openDocument\":{"))
+        assertTrue(FilyPrompt.render(system, emptyList()).startsWith(FilyPrompt.STABLE_PREFIX))
         val state = FilyPrompt.appState(true, false, "2026-11-16", FilyScreen("d1", pageCount = 12, readerCapabilities = listOf("next_page")))
         assertEquals(
             """APP_STATE={"enabled":true,"contentAllowed":false,"today":"2026-11-16","authorizedIds":["d1"],"selectedDocumentId":"d1","pageCount":12,"readerCapabilities":["next_page"]}""",
@@ -88,6 +89,25 @@ class FilySessionTest {
         assertEquals("opened", result["status"]!!.jsonPrimitive.content)
         assertEquals("resume.pdf", f.navigation.pending.value?.ref?.displayName)
         assertEquals(AssistantAction.Open, f.navigation.pending.value?.action)
+    }
+
+    @Test
+    fun actionsOnlyOpenReviewScreens() = runTest {
+        val f = FilyFixture(listOf(doc("a.pdf"), doc("b.pdf"), doc("notes.txt")))
+        assertEquals("chooser_opened", json(f.tools.execute("prepareShareDocument", json("""{"documentId":"id-a.pdf"}""")))["status"]!!.jsonPrimitive.content)
+        assertEquals(AssistantAction.Share, f.navigation.pending.value?.action)
+
+        json(f.tools.execute("mergePdfDocuments", json("""{"documentIds":["id-b.pdf","id-a.pdf"]}""")))
+        val merge = f.navigation.pending.value!!
+        assertEquals("Merge", merge.pdfTool)
+        assertEquals(listOf("b.pdf", "a.pdf"), merge.documents.map { it.displayName })
+
+        assertEquals("not_available", json(f.tools.execute("mergePdfDocuments", json("""{"documentIds":["id-notes.txt"]}""")))["reason"]!!.jsonPrimitive.content)
+        assertEquals("not_available", json(f.tools.execute("createTextDocument", json("""{"text":"hi","title":"../x"}""")))["reason"]!!.jsonPrimitive.content)
+
+        assertEquals("draft_ready", json(f.tools.execute("createTextDocument", json("""{"text":"Call Asha","title":"Follow-up"}""")))["status"]!!.jsonPrimitive.content)
+        assertEquals("Call Asha", f.navigation.pending.value?.draftText)
+        assertEquals("ScanToPdf", json(f.tools.execute("openScanner", null)).let { f.navigation.pending.value?.tool })
     }
 
     @Test

@@ -130,6 +130,8 @@ private fun createAndroidAppDependencies(context: Context, assistantAccess: Assi
     )
     val tidy = TidyService(device, documentText, AndroidTidyFiles(app), tidyEngine, tidyCache, tidyThread, ::currentTimeMillis)
     val assistantNavigation = AssistantNavigation()
+    val assistantTidy = AssistantTidyActions(assistantAccess, device,
+        loadReport = { tidy.load(); tidy.report.value }, validateRef = { validateAssistantDocument(app, it) })
     // Compiled GPU kernels are cached here; the engine's default temp folder does not exist on Android.
     android.system.Os.setenv("GGML_OPENCL_KERNEL_CACHE_DIR", File(app.cacheDir, "opencl-kernels").path, true)
     val modelManager = ModelManager(
@@ -138,7 +140,7 @@ private fun createAndroidAppDependencies(context: Context, assistantAccess: Assi
     )
     val filySession = FilySession(
         { prompt -> modelManager.complete(prompt) },
-        ToolExecutor(assistantActions, assistantNavigation),
+        ToolExecutor(assistantActions, assistantNavigation, assistantTidy),
         assistantAccess,
         today = { java.time.LocalDate.now().toString() },
     )
@@ -160,8 +162,7 @@ private fun createAndroidAppDependencies(context: Context, assistantAccess: Assi
         assistantActions = assistantActions,
         assistantNavigation = assistantNavigation,
         startupReady = device.initialMetadataReady,
-        assistantTidy = AssistantTidyActions(assistantAccess, device,
-            loadReport = { tidy.load(); tidy.report.value }, validateRef = { validateAssistantDocument(app, it) }),
+        assistantTidy = assistantTidy,
         documentText = documentText,
         nameSearch = RustFileNameSearch,
         contentSearch = contentSearch,

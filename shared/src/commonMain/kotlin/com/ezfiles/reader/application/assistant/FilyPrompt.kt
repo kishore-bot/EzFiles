@@ -40,8 +40,11 @@ internal object FilyPrompt {
             "Ask before ambiguous selection; preserve explicit ordering. No cloud fallback, passwords or shell access. " +
             "A review handoff is not task completion. Proposed tools are training contracts only."
 
-    /** The start every prompt shares, whatever the tools and state; the engine caches it. */
-    const val STABLE_PREFIX = "<|im_start|>system\n$POLICY"
+    /**
+     * The start every prompt shares, whatever the tools and state; the engine caches it. It ends
+     * inside the tool JSON because the policy's last token merges with the "\n" after it.
+     */
+    const val STABLE_PREFIX = "<|im_start|>system\n$POLICY\nTOOLS={\""
 
     private val catalog: JsonObject by lazy { Json.parseToJsonElement(FILY_TOOL_CATALOG).jsonObject }
 

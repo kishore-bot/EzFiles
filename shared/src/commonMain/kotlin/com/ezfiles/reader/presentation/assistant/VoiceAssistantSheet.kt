@@ -16,6 +16,10 @@ import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutVertically
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.background
+import androidx.compose.foundation.shape.CircleShape
+import com.ezfiles.reader.platform.SpeechState
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.statusBars
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -86,9 +90,12 @@ fun VoiceAssistantSheet(
     val tts = rememberTextToSpeech()
     val ttsState by tts.state.collectAsState()
 
+    // Silent sessions in a row; after MAX_QUIET_RESTARTS Fily pauses instead of listening forever.
+    var quietRestarts by remember { mutableIntStateOf(0) }
     val speech = rememberSpeechRecognition(hints = session::speechHints) { result ->
         partialText = result.text
         if (result.isFinal && result.text.isNotBlank()) {
+            quietRestarts = 0
             val userText = session.bestTranscript(result.alternatives)
             partialText = ""
             lastUserText = userText
@@ -105,10 +112,36 @@ fun VoiceAssistantSheet(
     val speechState by speech.state.collectAsState()
 
     LaunchedEffect(ttsState) {
-        if (ttsState == TtsState.Idle && assistantState == AssistantState.Speaking) {
+        if (ttsState != TtsState.Speaking && assistantState == AssistantState.Speaking) {
             assistantState = AssistantState.Listening
             speech.start()
         }
+    }
+
+    // Speech that never starts (no voice engine, or nothing to say) must not leave Fily stuck.
+    LaunchedEffect(assistantState) {
+        if (assistantState != AssistantState.Speaking) return@LaunchedEffect
+        delay(SPEECH_START_TIMEOUT_MS)
+        if (assistantState == AssistantState.Speaking && tts.state.value != TtsState.Speaking) {
+            assistantState = AssistantState.Listening
+            speech.start()
+        }
+    }
+
+    // Continuous listening: the recognizer ends on silence, a timeout or a dropped service without a
+    // request; Fily listens again by itself, and pauses after a long silence.
+    LaunchedEffect(speechState, assistantState) {
+        if (assistantState != AssistantState.Listening || speechState == SpeechState.Listening) return@LaunchedEffect
+        delay(RESTART_DELAY_MS)
+        if (assistantState != AssistantState.Listening) return@LaunchedEffect
+        if (quietRestarts >= MAX_QUIET_RESTARTS) {
+            quietRestarts = 0
+            partialText = ""
+            assistantState = AssistantState.Idle
+            return@LaunchedEffect
+        }
+        quietRestarts++
+        speech.start()
     }
 
     LaunchedEffect(modelState) {
@@ -174,6 +207,7 @@ fun VoiceAssistantSheet(
     fun toggleState() {
         when (assistantState) {
             AssistantState.Idle -> {
+                quietRestarts = 0
                 assistantState = AssistantState.Listening
                 speech.start()
             }
@@ -341,18 +375,28 @@ fun VoiceAssistantSheet(
             }
         }
 
-        // Status text below orb
-        Text(
-            when (assistantState) {
-                AssistantState.Idle -> if (modelState != ModelState.Ready) "Loading…" else ""
-                AssistantState.Listening -> "Listening…"
-                AssistantState.Processing -> ""
-                AssistantState.Speaking -> ""
-            },
-            color = Color.White.copy(alpha = 0.35f),
-            style = MaterialTheme.typography.labelSmall,
-            modifier = Modifier.align(Alignment.BottomCenter).padding(bottom = 24.dp),
-        )
+        // Always says what Fily is doing, so "is it loaded? is it listening?" never needs a guess.
+        val (status, dot) = when {
+            modelState == ModelState.Error -> "Fily couldn't load" to Color(0xFFE5484D)
+            modelState != ModelState.Ready -> "Loading Fily…" to Color(0xFFF5A524)
+            assistantState == AssistantState.Listening && speechState == SpeechState.Listening -> "Listening · speak now" to Color(0xFF30A46C)
+            assistantState == AssistantState.Listening -> "Starting the mic…" to Color(0xFFF5A524)
+            assistantState == AssistantState.Processing -> "Thinking…" to Color(0xFF3E63DD)
+            assistantState == AssistantState.Speaking -> "Speaking · tap to interrupt" to Color(0xFF8E4EC6)
+            else -> "Paused · tap the orb to talk" to EzColors.TextSecondary
+        }
+        Row(
+            Modifier
+                .align(Alignment.BottomCenter)
+                .padding(bottom = 8.dp)
+                .glassPanel(RoundedCornerShape(50))
+                .padding(horizontal = 14.dp, vertical = 6.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
+            Box(Modifier.size(8.dp).background(dot, CircleShape))
+            Text(status, color = EzColors.Text, style = MaterialTheme.typography.labelMedium)
+        }
 
         GlassIconButton(
             EzIcons.Close,
@@ -362,6 +406,11 @@ fun VoiceAssistantSheet(
         )
     }
 }
+
+private const val RESTART_DELAY_MS = 250L
+private const val SPEECH_START_TIMEOUT_MS = 2_500L
+/** About a minute of silence (each silent session lasts ~5-8 s) before Fily pauses. */
+private const val MAX_QUIET_RESTARTS = 8
 
 // HSV to Compose Color
 private fun hsvToColor(h: Float, s: Float, v: Float, alpha: Float): Color {

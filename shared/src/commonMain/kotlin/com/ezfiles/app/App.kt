@@ -335,6 +335,13 @@ fun App(
                     readerExitGuard?.leave(close) ?: close()
                 }
             }
+            LaunchedEffect(library) {
+                dependencies.filySession?.showSection = { section ->
+                    tool = null
+                    aboutRoute = null
+                    library.onFilterSelected(com.ezfiles.reader.presentation.library.FileFilter.entries.firstOrNull { it.name.equals(section, ignoreCase = true) } ?: com.ezfiles.reader.presentation.library.FileFilter.All)
+                }
+            }
             val openAbout: () -> Unit = { navigationHaptics.navigate(); aboutRoute = AboutRoute.About }
             val sendFeedback: () -> Unit = { dependencies.appInfo.sendFeedback() }
             // The PDF that PDF tools was opened from: tools start with it, and closing them goes back to it.

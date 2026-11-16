@@ -205,6 +205,36 @@ class FilySessionTest {
     }
 
     @Test
+    fun librarySectionsAndBareScrollAndGoBack() = runTest {
+        assertEquals("slides", QuickCommands.librarySection("go to the slide section"))
+        assertEquals("slides", QuickCommands.librarySection("I mean the slides section of the app".replace("the slides", "go to the slides")))
+        assertEquals("pdf", QuickCommands.librarySection("show me the PDF tab"))
+        assertEquals("recent", QuickCommands.librarySection("open recent files"))
+        assertEquals(null, QuickCommands.librarySection("open the invoice files"))
+        assertEquals(QuickCommand("scroll_down"), QuickCommands.parse("scroll", listOf("scroll_down")))
+        assertEquals(null, QuickCommands.parse("go back", listOf("previous_page")))
+        assertTrue(QuickCommands.isClose("go back"))
+        assertTrue(QuickCommands.isClose("OK go back"))
+        val f = FilyFixture(listOf(doc("notes.txt")))
+        val shown = ArrayList<String>()
+        val session = FilySession({ _, _ -> error("the model must not be asked") }, f.tools, f.access, today = { "2026-11-16" })
+        session.showSection = { shown += it }
+        assertEquals("Showing Slides.", session.ask("go to the slides section"))
+        assertEquals(listOf("slides"), shown)
+    }
+
+    @Test
+    fun aMadeUpIdOpensTheOneFileWithThoseWords() = runTest {
+        val f = FilyFixture(listOf(doc("Kishore_K_Styled_Resume.pdf"), doc("notes.txt")))
+        val result = json(f.tools.execute("openDocument", json("""{"documentId":"resume_1"}""")))
+        assertEquals("opened", result["status"]!!.jsonPrimitive.content)
+        assertEquals("Kishore_K_Styled_Resume.pdf", f.navigation.pending.value?.ref?.displayName)
+        val two = FilyFixture(listOf(doc("resume.pdf"), doc("resume.docx")))
+        assertEquals(2, json(two.tools.execute("openDocument", json("""{"documentId":"resume_1"}""")))["documents"]!!.jsonArray.size)
+        assertEquals("not_available", json(two.tools.execute("openDocument", json("""{"documentId":"zebra_1"}""")))["reason"]!!.jsonPrimitive.content)
+    }
+
+    @Test
     fun listPositionsAreOnlyForFiles() {
         assertEquals(0, QuickCommands.listPosition("open the first file on screen"))
         assertEquals(0, QuickCommands.listPosition("open the first file UC on screen"))

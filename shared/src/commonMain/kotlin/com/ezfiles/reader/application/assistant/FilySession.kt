@@ -21,6 +21,8 @@ class FilySession(
     private val reader: ReaderControl = ReaderControl(),
     /** Names of the library's files; only used, on the device, to help speech recognition. */
     private val fileNames: () -> List<String> = { emptyList() },
+    /** Debug trace of tool results and built-in commands; a no-op in release builds. */
+    private val log: (String) -> Unit = {},
 ) {
     /** Completed exchanges, oldest first; each starts with the user's turn. */
     private val history = ArrayList<List<FilyTurn>>()
@@ -33,6 +35,9 @@ class FilySession(
 
     /** Leaves the open file as the back button does (unsaved-changes prompt included); set by the UI. */
     var closeDocument: (() -> Unit)? = null
+
+    /** Shows a library section ("slides", "recent"), leaving any open file first; set by the UI. */
+    var showSection: ((String) -> Unit)? = null
 
     /** What is on screen, reported to the model as APP_STATE. */
     val screen: FilyScreen
@@ -49,9 +54,22 @@ class FilySession(
     suspend fun ask(request: String): String {
         val screen = screen
         QuickCommands.parse(request, screen.readerCapabilities, screen.pageCount)?.let { return quick(request, it) }
+        val show = showSection
+        QuickCommands.librarySection(request)?.takeIf { show != null }?.let { section ->
+            log("Built-in: section $section")
+            if (screen.selectedDocumentId != null) closeDocument?.invoke()
+            show!!(section)
+            val reply = if (section == "all") "Showing all your files." else "Showing ${section.replaceFirstChar(Char::uppercase)}."
+            remember(listOf(
+                FilyTurn(FilyRole.User, request),
+                FilyTurn(FilyRole.Assistant, buildJsonObject { put("kind", "reply"); put("text", reply); put("citations", buildJsonArray { }) }.toString()),
+            ))
+            return reply
+        }
         val close = closeDocument
         if (close != null && QuickCommands.isClose(request)) {
             if (screen.selectedDocumentId == null) return "No file is open."
+            log("Built-in: close")
             close()
             remember(listOf(
                 FilyTurn(FilyRole.User, request),
@@ -80,6 +98,7 @@ class FilySession(
                 return if (response.kind == "tool") "I couldn't finish that. Try asking another way." else spokenTextFor(response)
             }
             val result = if (toolName in toolNames) tools.execute(toolName, response.toolArgs) else UNOFFERED_TOOL
+            log("Tool $toolName -> ${result.take(300)}")
             exchange += FilyTurn(FilyRole.Tool, result)
         }
         error("unreachable")
@@ -106,6 +125,7 @@ class FilySession(
         alternatives.firstOrNull { QuickCommands.parse(it, screen.readerCapabilities, screen.pageCount) != null }?.let { return it }
         if (screen.selectedDocumentId == null) alternatives.firstOrNull { QuickCommands.listPosition(it) != null }?.let { return it }
         if (screen.selectedDocumentId != null) alternatives.firstOrNull(QuickCommands::isClose)?.let { return it }
+        alternatives.firstOrNull { QuickCommands.librarySection(it) != null }?.let { return it }
         val known = if (access.enabled.value) fileWords().map(String::lowercase).toSet() else return first
         val scored = alternatives.map { text -> text to text.lowercase().split(Regex("[^a-z0-9]+")).count { it in known } }
         val best = scored.maxByOrNull { it.second } ?: return first
@@ -123,6 +143,7 @@ class FilySession(
     /** Runs a recognised screen command directly, recorded as the model would have done it. */
     private suspend fun quick(request: String, command: QuickCommand): String {
         val result = reader.run(command.operation, command.value)
+        log("Built-in: ${command.operation} ${command.value.orEmpty()} -> ${result.failure ?: "done"}")
         val position = result.position
         val reply = QuickCommands.reply(command, position.page, position.pageCount, position.sheet, position.cell, result.failure)
         val call = buildJsonObject {
@@ -158,6 +179,7 @@ class FilySession(
             ?: return "There ${if (listed.size == 1) "is only 1 file" else "are only ${listed.size} files"} on screen."
         val args = buildJsonObject { put("documentId", file.documentId) }
         val result = tools.execute("openDocument", args)
+        log("Built-in: open listed #$position -> $result")
         val opened = "\"opened\"" in result
         val reply = if (opened) "Opening ${file.name}." else "I couldn't open ${file.name}."
         val alias = tools.alias(file.documentId)
@@ -188,6 +210,7 @@ class FilySession(
             "Fily", "next page", "previous page", "go to page", "zoom in", "zoom out", "scroll down", "scroll up",
             "select cell", "next sheet", "next photo", "rotate", "play", "pause", "open", "find", "resume", "CV",
             "PDF", "invoice", "receipt", "bookmark", "share", "print", "scan", "merge",
+            "slides section", "PDF section", "docs section", "sheets section", "images section", "recent files", "close", "go back",
         )
     }
 }

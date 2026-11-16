@@ -54,7 +54,13 @@ class ToolExecutor(
                 "getDocumentInfo" -> documentInfo(arguments.required("documentId"))
                 "getDocumentExcerpt" -> excerpt(arguments.required("documentId"), arguments.int("maxChars"))
                 "findTextInDocument" -> findText(arguments.required("documentId"), arguments.required("query"))
-                "openDocument" -> openDocument(arguments.required("documentId"))
+                "openDocument" -> arguments.required("documentId").let { id ->
+                    try {
+                        openDocument(id)
+                    } catch (notFound: IllegalArgumentException) {
+                        openByName(args?.string("documentId").orEmpty()) ?: throw notFound
+                    }
+                }
                 "listBookmarks" -> bookmarks(arguments.string("documentId").orEmpty())
                 "openBookmark" -> openBookmark(arguments.required("bookmarkId"))
                 "addBookmark" -> addBookmark(arguments.required("documentId"), arguments.int("pageNumber") ?: throw MissingArgument())
@@ -92,6 +98,22 @@ class ToolExecutor(
             failed("missing_arguments")
         } catch (_: IllegalArgumentException) {
             failed("not_available")
+        }
+    }
+
+    /**
+     * The model made up an ID from the user's words ("resume_1"): search the names for those words.
+     * One match opens; several go back to the model as search results, so it can ask which one.
+     */
+    private suspend fun openByName(said: String): String? {
+        if (said.isBlank() || ids.isAlias(said)) return null
+        val query = said.substringBeforeLast('.').split(Regex("[^A-Za-z]+")).filter { it.length >= 2 }.joinToString(" ")
+        if (query.isBlank()) return null
+        val found = actions.searchDocuments(query, RESULT_LIMIT)
+        return when (found.documents.size) {
+            0 -> null
+            1 -> openDocument(found.documents.single().id)
+            else -> documents(found)
         }
     }
 
@@ -284,6 +306,8 @@ internal class DocumentAliases {
 
     /** An unknown value passes through, so a wrong ID still fails the normal access checks. */
     fun resolve(value: String): String = byAlias[value] ?: value
+
+    fun isAlias(value: String): Boolean = value in byAlias
 
     fun resolveArguments(args: JsonObject): JsonObject = JsonObject(args.mapValues { (key, value) ->
         when (key) {

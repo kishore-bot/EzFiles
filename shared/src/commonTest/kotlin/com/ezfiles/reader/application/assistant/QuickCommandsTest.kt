@@ -31,7 +31,8 @@ class QuickCommandsTest {
     fun bareNextFollowsWhatIsOnScreen() {
         assertEquals(QuickCommand("next_page"), QuickCommands.parse("next", pdf))
         assertEquals(QuickCommand("next_photo"), QuickCommands.parse("next", photos))
-        assertEquals(QuickCommand("previous_photo"), QuickCommands.parse("back", photos))
+        assertEquals(QuickCommand("previous_photo"), QuickCommands.parse("previous", photos))
+        assertEquals(null, QuickCommands.parse("back", photos))
     }
 
     @Test

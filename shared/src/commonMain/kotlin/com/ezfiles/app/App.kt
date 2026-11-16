@@ -42,6 +42,11 @@ import com.ezfiles.reader.presentation.pdftools.LocalPdfToolRequest
 import com.ezfiles.reader.presentation.pdftools.LocalPdfToolRequestId
 import com.ezfiles.reader.presentation.pdftools.LocalPdfToolsPreselectList
 import com.ezfiles.reader.presentation.bookmarks.newBookmark
+import com.ezfiles.reader.platform.rememberMicPermission
+import com.ezfiles.reader.presentation.assistant.VoiceAssistantSheet
+import com.ezfiles.reader.presentation.components.GlassIconButton
+import com.ezfiles.reader.presentation.theme.EzIcons
+import com.ezfiles.reader.presentation.viewers.LocalReaderControl
 import com.ezfiles.reader.presentation.viewers.PdfExitGuard
 import com.ezfiles.reader.presentation.viewers.PhotoGallerySession
 import com.ezfiles.reader.presentation.viewers.PhotoGalleryState
@@ -165,6 +170,8 @@ class AppDependencies internal constructor(
     internal val documentEditor: DocumentEditor? = null,
     internal val modelManager: com.ezfiles.reader.application.assistant.ModelManager? = null,
     internal val filySession: com.ezfiles.reader.application.assistant.FilySession? = null,
+    /** The viewer on screen, as the assistant may drive it. */
+    internal val readerControl: com.ezfiles.reader.application.assistant.ReaderControl? = null,
 )
 
 @OptIn(ExperimentalTime::class)
@@ -267,8 +274,19 @@ fun App(
             LocalSensitiveCheck provides dependencies.sensitiveCheck,
             LocalGlancer provides dependencies.glancer,
             LocalDocumentEditor provides dependencies.documentEditor,
+            LocalReaderControl provides dependencies.readerControl,
         ) {
             PickerHost(state, pickedAction)
+            // Fily stays open across screens, so "open my resume" then "next page" is one conversation.
+            var voiceOpen by rememberSaveable { mutableStateOf(false) }
+            val micPermission = rememberMicPermission { granted -> if (granted) voiceOpen = true }
+            val openVoice: (() -> Unit)? = if (dependencies.modelManager != null && dependencies.filySession != null) {
+                { if (micPermission.granted) voiceOpen = true else micPermission.request() }
+            } else null
+            val openDocument = (state as? ReaderUiState.Ready)?.ref ?: (state as? ReaderUiState.Playing)?.ref
+            LaunchedEffect(openDocument) {
+                dependencies.filySession?.openDocumentId = openDocument?.let(dependencies.assistantActions::documentId)
+            }
             var tool by rememberSaveable { mutableStateOf<CreateTool?>(null) }
             var createSheet by rememberSaveable { mutableStateOf(false) }
             // About agent: the About and Why EzFiles pages, over the library like a tool.
@@ -449,8 +467,7 @@ fun App(
                                 reader.onAction(ReaderAction.DocumentPicked(it))
                             },
                             onOpenAbout = openAbout,
-                            modelManager = dependencies.modelManager,
-                            filySession = dependencies.filySession,
+                            onVoice = openVoice,
                             bookmarksContent = bookmarksContent,
                             // A PDF opens at the page the match is on, like a bookmark.
                             onOpenHit = { ref, page ->
@@ -503,6 +520,8 @@ fun App(
                             toolOrigin = open
                             tool = CreateTool.PdfTools
                             reader.onAction(ReaderAction.CloseDocument)
+                        }, trailingActions = {
+                            if (openVoice != null) GlassIconButton(EzIcons.Mic, "Voice assistant", openVoice)
                         })
                     }
                 }
@@ -564,6 +583,18 @@ fun App(
                         tool = it
                     },
                     onDismiss = { createSheet = false },
+                )
+            }
+            val model = dependencies.modelManager
+            val session = dependencies.filySession
+            if (voiceOpen && model != null && session != null) {
+                VoiceAssistantSheet(
+                    onDismiss = {
+                        voiceOpen = false
+                        session.clear()
+                    },
+                    modelManager = model,
+                    session = session,
                 )
             }
         }

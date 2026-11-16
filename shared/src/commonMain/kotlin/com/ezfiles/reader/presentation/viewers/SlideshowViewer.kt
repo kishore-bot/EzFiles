@@ -90,6 +90,7 @@ import androidx.compose.ui.util.lerp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import com.ezfiles.reader.domain.ContentBlock
+import com.ezfiles.reader.application.assistant.ReaderPosition
 import com.ezfiles.reader.domain.SlideShape
 import com.ezfiles.reader.platform.PresentationMode
 import com.ezfiles.reader.presentation.ReaderUiState
@@ -104,6 +105,8 @@ import com.ezfiles.reader.presentation.theme.glassBar
 import com.ezfiles.reader.presentation.theme.raised
 import kotlin.math.absoluteValue
 import kotlinx.coroutines.launch
+
+private val SLIDE_VOICE_OPERATIONS = setOf("next_page", "previous_page", "go_to_page", "scroll_top", "scroll_bottom")
 
 /**
  * One slide. PPTX slides carry a [canvas] and positioned [shapes]; formats
@@ -202,6 +205,24 @@ fun SlideshowViewer(state: ReaderUiState.Ready, onLoadMore: () -> Unit, onRetry:
     }
     val totalSlides = maxOf(slides.size, if (state.endReached) slides.size else announced)
     val scope = rememberCoroutineScope()
+
+    // A slide not loaded yet can't be shown; the reply says so instead of jumping short.
+    ReaderControlTarget(SLIDE_VOICE_OPERATIONS, ReaderPosition(page = pager.currentPage + 1, pageCount = totalSlides)) { operation, value ->
+        val target = when (operation) {
+            "next_page" -> pager.currentPage + 1
+            "previous_page" -> pager.currentPage - 1
+            "scroll_top" -> 0
+            "scroll_bottom" -> slides.size - 1
+            "go_to_page" -> spokenNumber(value)?.minus(1) ?: return@ReaderControlTarget "missing_page"
+            else -> return@ReaderControlTarget "unsupported_here"
+        }
+        when {
+            target < 0 -> "at_first_page"
+            target >= totalSlides -> if (operation == "next_page") "at_last_page" else "out_of_range"
+            target >= slides.size -> "still_loading"
+            else -> null.also { pager.animateScrollToPage(target) }
+        }
+    }
 
     // Load further slides before the user reaches the last one loaded.
     LaunchedEffect(pager.currentPage, slides.size, state.endReached, state.loadingMore) {

@@ -1,5 +1,7 @@
 package com.ezfiles.reader.presentation.viewers
 
+import com.ezfiles.reader.application.assistant.ReaderPosition
+import androidx.compose.foundation.gestures.animateScrollBy
 import com.ezfiles.reader.presentation.theme.rememberHapticActivation
 
 import com.ezfiles.reader.presentation.theme.rememberHapticChoice
@@ -94,6 +96,10 @@ private const val EMPTY_TRAILING_COLUMNS = 3
 
 /** Pages read without scrolling, so a workbook's later sheets show up as tabs. */
 private const val DISCOVERY_PAGES = 12
+
+private val SHEET_VOICE_OPERATIONS = setOf(
+    "select_cell", "next_sheet", "previous_sheet", "scroll_down", "scroll_up", "scroll_top", "scroll_bottom",
+)
 
 private val GridLine = Color(0xFFE3E6EC)
 private val HeaderBackground = Color(0xFFF3F4F7)
@@ -318,6 +324,42 @@ private fun SheetGrid(
             val viewportPx = with(density) { viewport.toPx() }
             if (left < horizontal.value || left + width > horizontal.value + viewportPx) {
                 horizontal.animateScrollTo((left - (viewportPx - width) / 2).toInt().coerceAtLeast(0))
+            }
+        }
+
+        val sheetIndex = workbook.sheets.indexOf(sheet)
+        val address = selected?.let { (row, column) -> sheet.rows.getOrNull(row)?.row?.row?.let { "${columnName(column)}$it" } }
+        ReaderControlTarget(SHEET_VOICE_OPERATIONS, ReaderPosition(sheet = sheet.title ?: "Sheet ${sheetIndex + 1}", cell = address)) { operation, value ->
+            when (operation) {
+                "select_cell" -> {
+                    val (column, rowNumber) = parseCellAddress(value) ?: return@ReaderControlTarget "missing_cell"
+                    val index = sheet.rows.indexOfFirst { it.row.row == rowNumber }
+                    when {
+                        column >= columns -> "out_of_range"
+                        index < 0 -> if (state.endReached) "out_of_range" else "still_loading"
+                        else -> {
+                            onSelect(index to column)
+                            listState.animateScrollToItem(index)
+                            val left = with(density) { (GutterWidth + starts.getOrElse(column) { 0f }.dp).toPx() }
+                            val width = with(density) { widths.getOrElse(column) { MIN_CELL_DP }.dp.toPx() }
+                            val viewportPx = with(density) { viewport.toPx() }
+                            if (left < horizontal.value || left + width > horizontal.value + viewportPx) {
+                                horizontal.animateScrollTo((left - (viewportPx - width) / 2).toInt().coerceAtLeast(0))
+                            }
+                            null
+                        }
+                    }
+                }
+                "next_sheet" -> if (sheetIndex + 1 > workbook.sheets.lastIndex) "at_last_sheet" else null.also { onShowSheet(sheetIndex + 1) }
+                "previous_sheet" -> if (sheetIndex <= 0) "at_first_sheet" else null.also { onShowSheet(sheetIndex - 1) }
+                "scroll_top" -> null.also { listState.animateScrollToItem(0) }
+                "scroll_bottom" -> null.also { listState.animateScrollToItem(sheet.rows.size) }
+                "scroll_down", "scroll_up" -> {
+                    val screen = listState.layoutInfo.viewportSize.height
+                    listState.animateScrollBy((if (operation == "scroll_down") 0.8f else -0.8f) * screen)
+                    null
+                }
+                else -> "unsupported_here"
             }
         }
 

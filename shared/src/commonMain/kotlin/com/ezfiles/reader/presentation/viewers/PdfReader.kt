@@ -6,6 +6,8 @@ import com.ezfiles.reader.presentation.theme.rememberEzHaptics
 import com.ezfiles.reader.presentation.theme.rememberHapticActivation
 
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.foundation.gestures.animateScrollBy
+import com.ezfiles.reader.application.assistant.ReaderPosition
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.spring
@@ -162,6 +164,9 @@ import kotlin.math.roundToInt
 
 private enum class ViewMode { Single, TwoUp, Grid }
 
+private val PDF_VOICE_OPERATIONS = setOf(
+    "next_page", "previous_page", "go_to_page", "zoom_in", "zoom_out", "scroll_down", "scroll_up", "scroll_top", "scroll_bottom",
+)
 private const val MIN_ZOOM = 50
 private const val MAX_ZOOM = 300
 private const val ZOOM_STEP = 25
@@ -341,6 +346,36 @@ private fun PdfReaderContent(
     }
 
     PdfBookmarks(ref, currentPage, goTo) // Bookmarks
+
+    val scrollToPage: suspend (Int) -> Unit = { page ->
+        if (mode == ViewMode.Grid) gridState.animateScrollToItem(page) else listState.animateScrollToItem(page / perRow)
+    }
+    ReaderControlTarget(PDF_VOICE_OPERATIONS, ReaderPosition(page = currentPage + 1, pageCount = pageCount)) { operation, value ->
+        when (operation) {
+            "next_page" -> if (currentPage + perRow >= pageCount) "at_last_page" else null.also { scrollToPage(currentPage + perRow) }
+            "previous_page" -> if (currentPage == 0) "at_first_page" else null.also { scrollToPage((currentPage - perRow).coerceAtLeast(0)) }
+            "go_to_page" -> when (val page = spokenNumber(value)) {
+                null -> "missing_page"
+                !in 1..pageCount -> "out_of_range"
+                else -> null.also { scrollToPage(page - 1) }
+            }
+            "scroll_top" -> null.also { scrollToPage(0) }
+            "scroll_bottom" -> null.also { scrollToPage(pageCount - 1) }
+            "scroll_down", "scroll_up" -> {
+                val state = if (mode == ViewMode.Grid) gridState else listState
+                val screen = if (mode == ViewMode.Grid) gridState.layoutInfo.viewportSize.height else listState.layoutInfo.viewportSize.height
+                state.animateScrollBy((if (operation == "scroll_down") 0.8f else -0.8f) * screen)
+                null
+            }
+            "zoom_in", "zoom_out" -> when {
+                mode == ViewMode.Grid -> "unsupported_here"
+                operation == "zoom_in" && zoom >= MAX_ZOOM -> "at_limit"
+                operation == "zoom_out" && zoom <= MIN_ZOOM -> "at_limit"
+                else -> null.also { zoom = (zoom + if (operation == "zoom_in") ZOOM_STEP else -ZOOM_STEP).coerceIn(MIN_ZOOM, MAX_ZOOM) }
+            }
+            else -> "unsupported_here"
+        }
+    }
 
     var searchOpen by remember { mutableStateOf(false) }
     var query by remember { mutableStateOf("") }

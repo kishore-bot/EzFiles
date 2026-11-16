@@ -1,8 +1,13 @@
 package com.ezfiles.reader.application.assistant
 
+import kotlinx.serialization.json.buildJsonArray
+import kotlinx.serialization.json.buildJsonObject
+import kotlinx.serialization.json.put
+
 /**
  * One spoken conversation with Fily: the model decides, [ToolExecutor] acts, and the tool's JSON
- * goes back to the model for a grounded reply. Not thread-safe; callers ask one question at a time.
+ * goes back to the model for a grounded reply. Exact screen commands skip the model. Not
+ * thread-safe; callers ask one question at a time.
  */
 class FilySession(
     /** Continues a rendered prompt; [ModelManager.complete] in the app. */
@@ -10,15 +15,29 @@ class FilySession(
     private val tools: ToolExecutor,
     private val access: AssistantAccess,
     private val today: () -> String,
+    private val reader: ReaderControl = ReaderControl(),
 ) {
     /** Completed exchanges, oldest first; each starts with the user's turn. */
     private val history = ArrayList<List<FilyTurn>>()
 
-    /** Updated by the UI as the user moves between the library and documents. */
-    var screen: FilyScreen = FilyScreen()
+    /** The assistant ID of the document on screen, set by the UI; null in the library. */
+    var openDocumentId: String? = null
+
+    /** What is on screen, reported to the model as APP_STATE. */
+    val screen: FilyScreen
+        get() {
+            val document = openDocumentId
+            return FilyScreen(
+                selectedDocumentId = document,
+                pageCount = reader.target.value?.position?.pageCount.takeIf { document != null },
+                readerCapabilities = if (document != null) reader.operations else emptyList(),
+            )
+        }
 
     /** Returns the text to show and speak. */
     suspend fun ask(request: String): String {
+        val screen = screen
+        QuickCommands.parse(request, screen.readerCapabilities, screen.pageCount)?.let { return quick(request, it) }
         val toolNames = ToolSelector.select(request, screen, tools.supported)
         val system = FilyPrompt.system(toolNames)
         val state = FilyTurn(FilyRole.User, FilyPrompt.appState(access.enabled.value, access.contentAccess.value, today(), screen))
@@ -40,6 +59,38 @@ class FilySession(
     }
 
     fun clear() = history.clear()
+
+    /** Runs a recognised screen command directly, recorded as the model would have done it. */
+    private suspend fun quick(request: String, command: QuickCommand): String {
+        val result = reader.run(command.operation, command.value)
+        val position = result.position
+        val reply = QuickCommands.reply(command, position.page, position.pageCount, position.sheet, position.cell, result.failure)
+        val call = buildJsonObject {
+            put("kind", "tool")
+            put("name", "controlReader")
+            put("arguments", buildJsonObject {
+                put("operation", command.operation)
+                command.value?.let { put("value", it) }
+            })
+        }
+        val outcome = if (result.failure != null) {
+            buildJsonObject { put("status", "failed"); put("reason", result.failure) }
+        } else {
+            buildJsonObject { put("status", "done"); position.page?.let { put("page", it) }; position.pageCount?.let { put("pageCount", it) } }
+        }
+        val answer = buildJsonObject {
+            put("kind", "reply")
+            put("text", reply)
+            put("citations", buildJsonArray { })
+        }
+        remember(listOf(
+            FilyTurn(FilyRole.User, request),
+            FilyTurn(FilyRole.Assistant, call.toString()),
+            FilyTurn(FilyRole.Tool, outcome.toString()),
+            FilyTurn(FilyRole.Assistant, answer.toString()),
+        ))
+        return reply
+    }
 
     private fun remember(exchange: List<FilyTurn>) {
         history += exchange.toList()

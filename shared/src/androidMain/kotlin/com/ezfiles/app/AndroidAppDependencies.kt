@@ -8,6 +8,7 @@ import com.ezfiles.reader.application.assistant.AssistantNavigation
 import com.ezfiles.reader.application.assistant.AssistantTidyActions
 import com.ezfiles.reader.application.assistant.FilySession
 import com.ezfiles.reader.application.assistant.ModelManager
+import com.ezfiles.reader.application.assistant.ReaderControl
 import com.ezfiles.reader.application.assistant.ToolExecutor
 import com.ezfiles.reader.data.androidDocumentIdentity
 import android.net.Uri
@@ -138,11 +139,13 @@ private fun createAndroidAppDependencies(context: Context, assistantAccess: Assi
         storage,
         buildStamp = app.packageManager.getPackageInfo(app.packageName, 0).lastUpdateTime.toString(),
     )
+    val readerControl = ReaderControl()
     val filySession = FilySession(
         { prompt -> modelManager.complete(prompt) },
-        ToolExecutor(assistantActions, assistantNavigation, assistantTidy),
+        ToolExecutor(assistantActions, assistantNavigation, assistantTidy, readerControl),
         assistantAccess,
         today = { java.time.LocalDate.now().toString() },
+        reader = readerControl,
     )
     return AppDependencies(
         reader = reader,
@@ -173,6 +176,7 @@ private fun createAndroidAppDependencies(context: Context, assistantAccess: Assi
         documentEditor = AndroidDocumentEditor(app),
         modelManager = modelManager,
         filySession = filySession,
+        readerControl = readerControl,
     )
 }
 

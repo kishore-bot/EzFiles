@@ -70,6 +70,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
+import com.ezfiles.reader.application.assistant.ReaderPosition
 import com.ezfiles.reader.domain.DocumentRef
 import com.ezfiles.reader.domain.MediaKind
 import com.ezfiles.reader.platform.HiddenSystemBars
@@ -105,6 +106,7 @@ import kotlin.math.abs
 import kotlin.math.roundToInt
 
 private const val CONTROLS_HIDE_MS = 3000L
+private val MEDIA_VOICE_OPERATIONS = setOf("play", "pause", "seek")
 
 private enum class VideoScale(val label: String) {
     Fit("Fit"),
@@ -132,6 +134,17 @@ fun MediaPlayerView(source: MediaSource, kind: MediaKind, title: String, modifie
     var interacting by remember { mutableStateOf(false) }
     var gestureMessage by remember { mutableStateOf<String?>(null) }
     var subtitleProblem by remember { mutableStateOf<String?>(null) }
+    // Only the full-screen player: media embedded in a document leaves the document in control.
+    if (onClose != null) {
+        ReaderControlTarget(MEDIA_VOICE_OPERATIONS, ReaderPosition()) { operation, value ->
+            when {
+                player.status != MediaStatus.Ready -> "not_ready"
+                operation == "play" -> null.also { player.play() }
+                operation == "pause" -> null.also { player.pause() }
+                else -> spokenNumber(value)?.let { seconds -> null.also { player.seekTo(seconds * 1000L) } } ?: "missing_time"
+            }
+        }
+    }
     var subtitleLoading by remember { mutableStateOf(false) }
     var orientationLocked by remember { mutableStateOf(false) }
     var menuOpen by remember { mutableStateOf(false) }

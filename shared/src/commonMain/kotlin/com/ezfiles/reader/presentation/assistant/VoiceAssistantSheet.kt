@@ -57,6 +57,12 @@ import com.ezfiles.reader.platform.TtsState
 import com.ezfiles.reader.platform.rememberSpeechRecognition
 import com.ezfiles.reader.platform.rememberTextToSpeech
 import com.ezfiles.reader.presentation.theme.EzColors
+import com.ezfiles.reader.presentation.theme.EzIcons
+import com.ezfiles.reader.presentation.components.GlassIconButton
+import com.ezfiles.reader.platform.PlatformBackHandler
+import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.mutableIntStateOf
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlin.math.PI
 import kotlin.math.cos
@@ -109,6 +115,25 @@ fun VoiceAssistantSheet(
         if (modelState == ModelState.Ready && assistantState == AssistantState.Idle) {
             assistantState = AssistantState.Listening
             speech.start()
+        }
+    }
+
+    // Closing stops listening and speaking; the app stays usable underneath while Fily is open.
+    PlatformBackHandler(enabled = true, onBack = onDismiss)
+    DisposableEffect(Unit) {
+        onDispose {
+            speech.cancel()
+            tts.stop()
+        }
+    }
+
+    // Counts while thinking, so a slow answer reads as work, not a freeze.
+    var thinkingSeconds by remember { mutableIntStateOf(0) }
+    LaunchedEffect(assistantState) {
+        thinkingSeconds = 0
+        while (assistantState == AssistantState.Processing) {
+            delay(1000)
+            thinkingSeconds++
         }
     }
 
@@ -180,7 +205,7 @@ fun VoiceAssistantSheet(
         // Conversation card at the top, under the status bar
         val question = partialText.ifBlank { lastUserText }
         val answer = when {
-            assistantState == AssistantState.Processing -> "Thinking…"
+            assistantState == AssistantState.Processing -> if (thinkingSeconds < 2) "Thinking…" else "Thinking… ${thinkingSeconds}s"
             else -> lastResponse
         }
         AnimatedVisibility(
@@ -327,6 +352,13 @@ fun VoiceAssistantSheet(
             color = Color.White.copy(alpha = 0.35f),
             style = MaterialTheme.typography.labelSmall,
             modifier = Modifier.align(Alignment.BottomCenter).padding(bottom = 24.dp),
+        )
+
+        GlassIconButton(
+            EzIcons.Close,
+            "Close Fily",
+            onDismiss,
+            modifier = Modifier.align(Alignment.BottomEnd).padding(end = 24.dp, bottom = 72.dp),
         )
     }
 }

@@ -19,8 +19,10 @@ class ToolExecutor(
     private val actions: AssistantActions,
     private val navigation: AssistantNavigation,
     private val tidy: AssistantTidyActions? = null,
+    private val reader: ReaderControl? = null,
 ) {
     val supported: Set<String> = setOf(
+        "controlReader",
         "searchLibrary", "searchDocuments", "listRecentDocuments", "getDocumentInfo",
         "getDocumentExcerpt", "findTextInDocument", "openDocument", "listBookmarks", "openBookmark", "addBookmark",
         "prepareShareDocument", "prepareShareDocuments", "preparePrintDocument",
@@ -66,6 +68,8 @@ class ToolExecutor(
                 "preparePdfToZip" -> pdfTool("ToZip", arguments.string("documentId"))
                 "openPasswordTool" -> pdfTool("AddPassword", arguments.string("documentId"))
                 "getTidyReport" -> tidyReport()
+                "controlReader" -> reader?.perform(arguments.required("operation"), (arguments["value"] as? JsonPrimitive)?.content)
+                    ?: failed("no_document")
                 else -> failed("unsupported_tool")
             }
         } catch (cancelled: CancellationException) {

@@ -136,6 +136,17 @@ private val NUMERIC = Regex("""^[-+(]?[$€£¥₹]?\s?[-+]?(\d{1,3}(,\d{3})+|\d
 fun looksNumeric(cell: String): Boolean = cell.isNotEmpty() && cell.any(Char::isDigit) && NUMERIC.matches(cell.trim())
 
 /** "A", "B", … "Z", "AA", … for a zero-based column. */
+/** "B3", "b 3" or "B three" to (column index from 0, row number from 1); null when not a cell address. */
+internal fun parseCellAddress(text: String?): Pair<Int, Int>? {
+    val compact = text?.trim()?.uppercase() ?: return null
+    val letters = compact.takeWhile(Char::isLetter)
+    if (letters.isEmpty() || letters.length > 3 || letters.any { it !in 'A'..'Z' }) return null
+    val row = spokenNumber(compact.drop(letters.length).trim()) ?: return null
+    if (row < 1) return null
+    val column = letters.fold(0) { acc, c -> acc * 26 + (c - 'A' + 1) } - 1
+    return column to row
+}
+
 fun columnName(index: Int): String {
     var n = index + 1
     val out = StringBuilder()

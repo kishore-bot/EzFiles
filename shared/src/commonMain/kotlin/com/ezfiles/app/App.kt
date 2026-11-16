@@ -239,7 +239,10 @@ fun App(
         if (mm.state.value == com.ezfiles.reader.application.assistant.ModelState.Idle) {
             mm.load(
                 modelPath = "/data/local/tmp/Fily-EzFiles-350M-Q8_0.gguf",
-                preferGpu = true,
+                // Measured on an Adreno 810 with the Q8 model: OpenCL read prompts at ~350 tok/s
+                // and wrote ~22 tok/s, against ~600 and ~25 on the CPU, and its first run compiles
+                // kernels for a minute or more. Revisit with a Q4 model, which Adreno's kernels favour.
+                preferGpu = false,
             )
         }
     }

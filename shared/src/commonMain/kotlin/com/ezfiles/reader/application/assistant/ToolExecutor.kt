@@ -32,8 +32,16 @@ class ToolExecutor(
         "openPasswordTool", "openTidyUp", "openSimilarDocuments", "startTidyScan",
     ) + if (tidy != null) setOf("getTidyReport") else emptySet()
 
+    /**
+     * The model sees "doc_1" instead of 64-character opaque IDs: each full ID costs ~35 tokens to
+     * read and to cite, and short IDs are what it was trained on.
+     */
+    private val ids = DocumentAliases()
+
+    fun alias(documentId: String): String = ids.alias(documentId)
+
     suspend fun execute(name: String, args: JsonObject?): String {
-        val arguments = args ?: JsonObject(emptyMap())
+        val arguments = ids.resolveArguments(args ?: JsonObject(emptyMap()))
         return try {
             when (name) {
                 "searchLibrary" -> documents(actions.searchLibrary(libraryQuery(arguments), RESULT_LIMIT))
@@ -86,7 +94,7 @@ class ToolExecutor(
     private fun documents(results: AssistantDocumentResults): String = buildJsonObject {
         put("documents", JsonArray(results.documents.map { doc ->
             buildJsonObject {
-                put("id", doc.id)
+                put("id", ids.alias(doc.id))
                 put("name", doc.name)
             }
         }))
@@ -96,7 +104,7 @@ class ToolExecutor(
     private suspend fun documentInfo(id: String): String {
         val doc = actions.getDocumentInfo(id)
         return buildJsonObject {
-            put("documentId", doc.id)
+            put("documentId", ids.alias(doc.id))
             put("name", doc.name)
             doc.sizeBytes?.let { put("sizeBytes", it) }
             doc.modifiedAt?.let { put("modified", isoDate(it)) }
@@ -107,7 +115,7 @@ class ToolExecutor(
         // Short enough to leave room for the reply in the model's context window.
         val excerpt = actions.getDocumentExcerpt(id, (maxChars ?: MAX_EXCERPT_CHARS).coerceIn(1, MAX_EXCERPT_CHARS))
         return buildJsonObject {
-            put("documentId", excerpt.document.id)
+            put("documentId", ids.alias(excerpt.document.id))
             put("text", excerpt.text)
             put("available", excerpt.available)
             put("truncated", excerpt.truncated)
@@ -117,7 +125,7 @@ class ToolExecutor(
     private suspend fun findText(id: String, query: String): String {
         val found = actions.findTextInDocument(id, query, limit = 5)
         return buildJsonObject {
-            put("documentId", found.document.id)
+            put("documentId", ids.alias(found.document.id))
             put("matches", JsonArray(found.matches.map { match ->
                 buildJsonObject {
                     put("offset", match.offset)
@@ -145,10 +153,10 @@ class ToolExecutor(
     }
 
     private suspend fun openDocument(id: String): String =
-        handoff("opened", { put("documentId", id) }) { AssistantDestination(actions.resolveDocument(id), AssistantAction.Open, it) }
+        handoff("opened", { put("documentId", ids.alias(id)) }) { AssistantDestination(actions.resolveDocument(id), AssistantAction.Open, it) }
 
     private suspend fun documentHandoff(id: String, action: AssistantAction, status: String): String =
-        handoff(status, { put("documentId", id) }) { AssistantDestination(actions.resolveDocument(id), action, it) }
+        handoff(status, { put("documentId", ids.alias(id)) }) { AssistantDestination(actions.resolveDocument(id), action, it) }
 
     private suspend fun shareDocuments(ids: List<String>): String = handoff("chooser_opened") {
         require(ids.isNotEmpty()) { "Choose at least one document." }
@@ -156,7 +164,7 @@ class ToolExecutor(
         AssistantDestination(refs.first(), AssistantAction.Share, it, documents = refs)
     }
 
-    private suspend fun addBookmark(id: String, pageNumber: Int): String = handoff("review_pending", { put("documentId", id) }) {
+    private suspend fun addBookmark(id: String, pageNumber: Int): String = handoff("review_pending", { put("documentId", ids.alias(id)) }) {
         val ref = actions.resolveDocument(id)
         require(ref.displayName.endsWith(".pdf", ignoreCase = true) && pageNumber in 1..100_000) { "Choose a PDF and an existing page." }
         AssistantDestination(ref, AssistantAction.Bookmark, it, pageNumber = pageNumber)
@@ -202,7 +210,7 @@ class ToolExecutor(
             put("bookmarks", JsonArray(list.map { bookmark ->
                 buildJsonObject {
                     put("bookmarkId", bookmark.id)
-                    put("documentId", bookmark.document.id)
+                    put("documentId", ids.alias(bookmark.document.id))
                     put("name", bookmark.document.name)
                     bookmark.pageNumber?.let { put("pageNumber", it) }
                     bookmark.chapterNumber?.let { put("chapterNumber", it) }
@@ -252,6 +260,27 @@ class ToolExecutor(
         const val RESULT_LIMIT = 8
         const val MAX_EXCERPT_CHARS = 1500
     }
+}
+
+/** Short, stable stand-ins for opaque document IDs, valid for the life of the app process. */
+internal class DocumentAliases {
+    private val byId = HashMap<String, String>()
+    private val byAlias = HashMap<String, String>()
+
+    fun alias(id: String): String = byId.getOrPut(id) { "doc_${byId.size + 1}".also { byAlias[it] = id } }
+
+    /** An unknown value passes through, so a wrong ID still fails the normal access checks. */
+    fun resolve(value: String): String = byAlias[value] ?: value
+
+    fun resolveArguments(args: JsonObject): JsonObject = JsonObject(args.mapValues { (key, value) ->
+        when (key) {
+            "documentId" -> (value as? JsonPrimitive)?.takeIf { it.isString }?.let { JsonPrimitive(resolve(it.content)) } ?: value
+            "documentIds" -> (value as? JsonArray)?.let { list ->
+                JsonArray(list.map { item -> (item as? JsonPrimitive)?.takeIf { it.isString }?.let { JsonPrimitive(resolve(it.content)) } ?: item })
+            } ?: value
+            else -> value
+        }
+    })
 }
 
 /** Name keywords for the categories the model asks for; names only, never file contents. */

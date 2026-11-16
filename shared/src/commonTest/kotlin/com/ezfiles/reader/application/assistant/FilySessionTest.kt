@@ -111,6 +111,17 @@ class FilySessionTest {
     }
 
     @Test
+    fun theModelSeesShortIdsThatResolveBack() = runTest {
+        val f = FilyFixture(listOf(doc("a-resume.pdf"), doc("b-resume.pdf")))
+        val found = json(f.tools.execute("searchLibrary", json("""{"query":"resume","sort":"relevance"}""")))
+        val ids = found["documents"]!!.jsonArray.map { it.jsonObject["id"]!!.jsonPrimitive.content }
+        assertEquals(listOf("doc_1", "doc_2"), ids)
+        assertEquals("doc_2", json(f.tools.execute("openDocument", json("""{"documentId":"doc_2"}""")))["documentId"]!!.jsonPrimitive.content)
+        assertEquals("b-resume.pdf", f.navigation.pending.value?.ref?.displayName)
+        assertEquals("not_available", json(f.tools.execute("openDocument", json("""{"documentId":"doc_9"}""")))["reason"]!!.jsonPrimitive.content)
+    }
+
+    @Test
     fun failuresComeBackAsJsonNotExceptions() = runTest {
         val f = FilyFixture(listOf(doc("a.pdf")))
         assertEquals("not_available", json(f.tools.execute("openDocument", json("""{"documentId":"foreign"}""")))["reason"]!!.jsonPrimitive.content)
@@ -129,7 +140,7 @@ class FilySessionTest {
         ))
         val session = FilySession({ prompts += it; replies.removeFirst() }, f.tools, f.access, today = { "2026-11-16" })
         assertEquals("I found resume.pdf.", session.ask("find my resume"))
-        assertTrue(prompts[1].contains("<|im_start|>tool\n{\"documents\":[{\"id\":\"id-resume.pdf\",\"name\":\"resume.pdf\"}],\"partial\":false}<|im_end|>"))
+        assertTrue(prompts[1].contains("<|im_start|>tool\n{\"documents\":[{\"id\":\"doc_1\",\"name\":\"resume.pdf\"}],\"partial\":false}<|im_end|>"))
         assertTrue(prompts[1].contains("<|im_start|>assistant\n{\"kind\":\"tool\",\"name\":\"searchLibrary\""))
     }
 

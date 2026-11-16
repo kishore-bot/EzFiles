@@ -26,7 +26,7 @@ class FilySession(
     /** What is on screen, reported to the model as APP_STATE. */
     val screen: FilyScreen
         get() {
-            val document = openDocumentId
+            val document = openDocumentId?.let(tools::alias)
             return FilyScreen(
                 selectedDocumentId = document,
                 pageCount = reader.target.value?.position?.pageCount.takeIf { document != null },

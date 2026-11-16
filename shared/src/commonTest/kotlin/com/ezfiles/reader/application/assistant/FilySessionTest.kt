@@ -18,6 +18,7 @@ import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 
 private class FilyDevice(refs: List<DocumentRef>) : DeviceDocuments {
@@ -186,6 +187,21 @@ class FilySessionTest {
         assertEquals("Opening resume.pdf.", session.ask("open the second one"))
         assertEquals("Opening resume.pdf.", session.ask("open the last file"))
         assertEquals("There are only 2 files on screen.", session.ask("open the fifth file"))
+    }
+
+    @Test
+    fun closeLeavesTheOpenFileWithoutTheModel() = runTest {
+        val f = FilyFixture(listOf(doc("notes.txt")))
+        var closed = 0
+        val session = FilySession({ _, _ -> error("the model must not be asked") }, f.tools, f.access, today = { "2026-11-16" })
+        session.closeDocument = { closed++ }
+        assertEquals("No file is open.", session.ask("close this document"))
+        session.openDocumentId = "id-notes.txt"
+        assertEquals("Closed.", session.ask("I mean close this document"))
+        assertEquals("Closed.", session.ask("exit"))
+        assertEquals("Closed.", session.ask("go back to the library"))
+        assertEquals(2 + 1, closed)
+        assertFalse(QuickCommands.isClose("close the deal with Aster Labs"))
     }
 
     @Test

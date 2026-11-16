@@ -328,6 +328,13 @@ fun App(
                 if (!assistantOn) dependencies.assistantNavigation.clear()
             }
             val navigationHaptics = rememberEzHaptics()
+            // "Close this document": the same path as the back button, unsaved-PDF prompt included.
+            LaunchedEffect(Unit) {
+                dependencies.filySession?.closeDocument = {
+                    val close = { navigationHaptics.navigate(); reader.onAction(ReaderAction.CloseDocument) }
+                    readerExitGuard?.leave(close) ?: close()
+                }
+            }
             val openAbout: () -> Unit = { navigationHaptics.navigate(); aboutRoute = AboutRoute.About }
             val sendFeedback: () -> Unit = { dependencies.appInfo.sendFeedback() }
             // The PDF that PDF tools was opened from: tools start with it, and closing them goes back to it.

@@ -16,6 +16,8 @@ class FilySession(
     private val access: AssistantAccess,
     private val today: () -> String,
     private val reader: ReaderControl = ReaderControl(),
+    /** Names of the library's files; only used, on the device, to help speech recognition. */
+    private val fileNames: () -> List<String> = { emptyList() },
 ) {
     /** Completed exchanges, oldest first; each starts with the user's turn. */
     private val history = ArrayList<List<FilyTurn>>()
@@ -60,6 +62,37 @@ class FilySession(
 
     fun clear() = history.clear()
 
+    /**
+     * Words the recognizer should expect: Fily's commands, and the words in file names when the
+     * user has let the assistant see the library.
+     */
+    fun speechHints(): List<String> {
+        val words = if (access.enabled.value) fileWords() else emptyList()
+        return (COMMAND_HINTS + words).distinct()
+    }
+
+    /**
+     * Of the recognizer's guesses, the one that is a command for this screen, else the one that
+     * names the most file-name words, else its own first choice.
+     */
+    fun bestTranscript(alternatives: List<String>): String {
+        val first = alternatives.firstOrNull().orEmpty()
+        val screen = screen
+        alternatives.firstOrNull { QuickCommands.parse(it, screen.readerCapabilities, screen.pageCount) != null }?.let { return it }
+        val known = if (access.enabled.value) fileWords().map(String::lowercase).toSet() else return first
+        val scored = alternatives.map { text -> text to text.lowercase().split(Regex("[^a-z0-9]+")).count { it in known } }
+        val best = scored.maxByOrNull { it.second } ?: return first
+        return if (best.second > (scored.firstOrNull()?.second ?: 0)) best.first else first
+    }
+
+    private fun fileWords(): List<String> = fileNames().asSequence()
+        .flatMap { it.substringBeforeLast('.').split(Regex("[^A-Za-z0-9]+")).asSequence() }
+        // Two letters keep abbreviations such as "CV".
+        .filter { it.length >= 2 && !it.all(Char::isDigit) }
+        .distinctBy(String::lowercase)
+        .take(MAX_FILE_HINTS)
+        .toList()
+
     /** Runs a recognised screen command directly, recorded as the model would have done it. */
     private suspend fun quick(request: String, command: QuickCommand): String {
         val result = reader.run(command.operation, command.value)
@@ -101,5 +134,11 @@ class FilySession(
         const val MAX_TOOL_STEPS = 3
         const val MAX_HISTORY_EXCHANGES = 2
         const val UNOFFERED_TOOL = """{"status":"failed","reason":"unsupported_tool"}"""
+        const val MAX_FILE_HINTS = 80
+        val COMMAND_HINTS = listOf(
+            "Fily", "next page", "previous page", "go to page", "zoom in", "zoom out", "scroll down", "scroll up",
+            "select cell", "next sheet", "next photo", "rotate", "play", "pause", "open", "find", "resume", "CV",
+            "PDF", "invoice", "receipt", "bookmark", "share", "print", "scan", "merge",
+        )
     }
 }

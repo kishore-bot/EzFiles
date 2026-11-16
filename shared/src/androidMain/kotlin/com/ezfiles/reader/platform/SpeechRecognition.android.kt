@@ -2,21 +2,25 @@ package com.ezfiles.reader.platform
 
 import android.content.Context
 import android.content.Intent
+import android.os.Build
 import android.os.Bundle
 import android.speech.RecognitionListener
 import android.speech.RecognizerIntent
 import android.speech.SpeechRecognizer
+import android.util.Log
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.ui.platform.LocalContext
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
-
-actual class SpeechResult actual constructor(actual val text: String, actual val isFinal: Boolean)
+import java.util.Locale
 
 actual class SpeechRecognition(
     private val context: Context,
+    private val hints: () -> List<String>,
     private val onResult: (SpeechResult) -> Unit,
 ) {
     private val _state = MutableStateFlow(SpeechState.Idle)
@@ -24,13 +28,22 @@ actual class SpeechRecognition(
 
     private var recognizer: SpeechRecognizer? = null
 
+    /**
+     * The system's default recognizer may stream audio to a server. EzFiles is offline, so the
+     * on-device recognizer is used wherever the phone has one, and the default one is told to
+     * stay offline otherwise.
+     */
+    private val onDevice: Boolean
+        get() = Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU && SpeechRecognizer.isOnDeviceRecognitionAvailable(context)
+
     actual fun start() {
         cancel()
-        if (!SpeechRecognizer.isRecognitionAvailable(context)) {
+        val local = onDevice
+        if (!local && !SpeechRecognizer.isRecognitionAvailable(context)) {
             _state.value = SpeechState.Error
             return
         }
-        val sr = SpeechRecognizer.createSpeechRecognizer(context)
+        val sr = if (local) SpeechRecognizer.createOnDeviceSpeechRecognizer(context) else SpeechRecognizer.createSpeechRecognizer(context)
         sr.setRecognitionListener(object : RecognitionListener {
             override fun onReadyForSpeech(params: Bundle?) { _state.value = SpeechState.Listening }
             override fun onBeginningOfSpeech() {}
@@ -38,17 +51,17 @@ actual class SpeechRecognition(
             override fun onBufferReceived(buffer: ByteArray?) {}
             override fun onEndOfSpeech() {}
             override fun onError(error: Int) {
+                Log.w(TAG, "Recognition error $error (on-device=$local)")
                 _state.value = SpeechState.Error
             }
             override fun onResults(results: Bundle?) {
-                val matches = results?.getStringArrayList(SpeechRecognizer.RESULTS_RECOGNITION)
-                val text = matches?.firstOrNull() ?: ""
-                if (text.isNotBlank()) onResult(SpeechResult(text, true))
+                val matches = results?.getStringArrayList(SpeechRecognizer.RESULTS_RECOGNITION).orEmpty().filter(String::isNotBlank)
+                Log.i(TAG, "Heard (on-device=$local): $matches")
+                if (matches.isNotEmpty()) onResult(SpeechResult(matches.first(), true, matches))
                 _state.value = SpeechState.Idle
             }
             override fun onPartialResults(partial: Bundle?) {
-                val matches = partial?.getStringArrayList(SpeechRecognizer.RESULTS_RECOGNITION)
-                val text = matches?.firstOrNull() ?: ""
+                val text = partial?.getStringArrayList(SpeechRecognizer.RESULTS_RECOGNITION)?.firstOrNull().orEmpty()
                 if (text.isNotBlank()) onResult(SpeechResult(text, false))
             }
             override fun onEvent(eventType: Int, params: Bundle?) {}
@@ -56,8 +69,17 @@ actual class SpeechRecognition(
         recognizer = sr
         val intent = Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH).apply {
             putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL, RecognizerIntent.LANGUAGE_MODEL_FREE_FORM)
+            putExtra(RecognizerIntent.EXTRA_LANGUAGE, Locale.getDefault().toLanguageTag())
             putExtra(RecognizerIntent.EXTRA_PARTIAL_RESULTS, true)
-            putExtra(RecognizerIntent.EXTRA_MAX_RESULTS, 1)
+            // Several guesses: the assistant keeps the one that names a file or a command.
+            putExtra(RecognizerIntent.EXTRA_MAX_RESULTS, 5)
+            putExtra(RecognizerIntent.EXTRA_PREFER_OFFLINE, true)
+            // Room for a short pause mid-sentence ("open the... resume").
+            putExtra(RecognizerIntent.EXTRA_SPEECH_INPUT_COMPLETE_SILENCE_LENGTH_MILLIS, 1500L)
+            putExtra(RecognizerIntent.EXTRA_SPEECH_INPUT_POSSIBLY_COMPLETE_SILENCE_LENGTH_MILLIS, 1200L)
+            if (local && Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                putStringArrayListExtra(RecognizerIntent.EXTRA_BIASING_STRINGS, ArrayList(hints().take(MAX_HINTS)))
+            }
         }
         sr.startListening(intent)
         _state.value = SpeechState.Listening
@@ -75,12 +97,18 @@ actual class SpeechRecognition(
     }
 
     fun destroy() { cancel() }
+
+    private companion object {
+        const val TAG = "EzSpeech"
+        const val MAX_HINTS = 100
+    }
 }
 
 @Composable
-actual fun rememberSpeechRecognition(onResult: (SpeechResult) -> Unit): SpeechRecognition {
+actual fun rememberSpeechRecognition(hints: () -> List<String>, onResult: (SpeechResult) -> Unit): SpeechRecognition {
     val context = LocalContext.current
-    val sr = remember(context) { SpeechRecognition(context, onResult) }
+    val latestHints by rememberUpdatedState(hints)
+    val sr = remember(context) { SpeechRecognition(context, { latestHints() }, onResult) }
     DisposableEffect(sr) { onDispose { sr.destroy() } }
     return sr
 }

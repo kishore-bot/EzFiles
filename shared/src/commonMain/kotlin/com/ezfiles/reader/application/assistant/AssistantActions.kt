@@ -18,6 +18,21 @@ data class AssistantExcerpt(val document: AssistantDocument, val text: String, v
 data class AssistantTextMatch(val offset: Int, val snippet: String)
 data class AssistantTextMatches(val document: AssistantDocument, val matches: List<AssistantTextMatch>, val partial: Boolean, val available: Boolean)
 
+enum class AssistantSort { Relevance, ModifiedNewest, OpenedNewest, SizeLargest }
+
+/** A library search the assistant can narrow; every field is optional and matched against names and metadata only. */
+data class AssistantLibraryQuery(
+    val query: String = "",
+    /** At least one of these must appear in the name (a category's keywords, e.g. resume or cv). */
+    val anyOf: List<String> = emptyList(),
+    val extensions: Set<String> = emptySet(),
+    val exclude: List<String> = emptyList(),
+    val modifiedAfter: Long? = null,
+    val modifiedBefore: Long? = null,
+    val minBytes: Long? = null,
+    val sort: AssistantSort = AssistantSort.Relevance,
+)
+
 /** Local, bounded actions. Platform wrappers never send [DocumentRef] or raw URIs to an assistant. */
 class AssistantActions internal constructor(
     private val device: DeviceDocuments,
@@ -39,6 +54,40 @@ class AssistantActions internal constructor(
         val readable = readable(matches, token, resultLimit(limit))
         AssistantDocumentResults(readable.refs.map(::metadata), snapshot.partial || readable.partial)
     }
+
+    suspend fun searchLibrary(search: AssistantLibraryQuery, limit: Int = 0): AssistantDocumentResults = access.authorized { token ->
+        require(search.query.length <= MAX_QUERY_CHARS) { "Search text is too long." }
+        val snapshot = snapshot(token)
+        val terms = search.query.trim().split(Regex("\\s+")).filter(String::isNotEmpty)
+        val anyOf = search.anyOf.filter(String::isNotBlank)
+        val exclude = search.exclude.filter(String::isNotBlank)
+        val extensions = search.extensions.map { it.lowercase().removePrefix(".") }.toSet()
+        val matches = snapshot.refs.filter { ref ->
+            val name = ref.displayName.take(512)
+            terms.all { name.contains(it, ignoreCase = true) } &&
+                (anyOf.isEmpty() || anyOf.any { name.contains(it, ignoreCase = true) }) &&
+                exclude.none { name.contains(it, ignoreCase = true) } &&
+                (extensions.isEmpty() || name.substringAfterLast('.', "").lowercase() in extensions) &&
+                (search.modifiedAfter == null || (ref.modifiedAt ?: Long.MIN_VALUE) >= search.modifiedAfter) &&
+                (search.modifiedBefore == null || (ref.modifiedAt ?: Long.MAX_VALUE) < search.modifiedBefore) &&
+                (search.minBytes == null || (ref.sizeBytes ?: 0) >= search.minBytes)
+        }
+        val ordered = when (search.sort) {
+            AssistantSort.Relevance -> matches
+            // Unknown dates sort last: they cannot prove a file is the newest.
+            AssistantSort.ModifiedNewest -> matches.sortedByDescending { it.modifiedAt ?: Long.MIN_VALUE }
+            AssistantSort.SizeLargest -> matches.sortedByDescending { it.sizeBytes ?: -1L }
+            AssistantSort.OpenedNewest -> {
+                val opened = recents.documents.value.withIndex().associate { (index, recent) -> opaqueId(recent.ref) to index }
+                matches.filter { opaqueId(it) in opened }.sortedBy { opened.getValue(opaqueId(it)) }
+            }
+        }
+        val readable = readable(ordered.take(MAX_RESULT_CANDIDATES + 1), token, resultLimit(limit))
+        AssistantDocumentResults(readable.refs.map(::metadata), snapshot.partial || readable.partial)
+    }
+
+    /** The assistant's opaque ID for a document the user already has open. */
+    fun documentId(ref: DocumentRef): String = opaqueId(ref)
 
     suspend fun listRecentDocuments(limit: Int = 0): AssistantDocumentResults = access.authorized { token ->
         val snapshot = snapshot(token)

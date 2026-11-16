@@ -50,13 +50,9 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
-import com.ezfiles.reader.application.assistant.ConversationManager
+import com.ezfiles.reader.application.assistant.FilySession
 import com.ezfiles.reader.application.assistant.ModelManager
 import com.ezfiles.reader.application.assistant.ModelState
-import com.ezfiles.reader.application.assistant.ToolExecutor
-import com.ezfiles.reader.application.assistant.ToolResult
-import com.ezfiles.reader.application.assistant.parseModelResponse
-import com.ezfiles.reader.application.assistant.spokenTextFor
 import com.ezfiles.reader.platform.TtsState
 import com.ezfiles.reader.platform.rememberSpeechRecognition
 import com.ezfiles.reader.platform.rememberTextToSpeech
@@ -72,13 +68,10 @@ enum class AssistantState { Idle, Listening, Processing, Speaking }
 fun VoiceAssistantSheet(
     onDismiss: () -> Unit,
     modelManager: ModelManager,
-    conversation: ConversationManager,
-    toolExecutor: ToolExecutor? = null,
-    onNavigate: (String) -> Unit = {},
+    session: FilySession,
 ) {
     val scope = rememberCoroutineScope()
     val modelState by modelManager.state.collectAsState()
-    val turns by conversation.turns.collectAsState()
     var assistantState by remember { mutableStateOf(AssistantState.Idle) }
     var partialText by remember { mutableStateOf("") }
     var lastResponse by remember { mutableStateOf("") }
@@ -96,31 +89,7 @@ fun VoiceAssistantSheet(
             lastResponse = ""
             assistantState = AssistantState.Processing
             scope.launch {
-                val raw = modelManager.call(userText, conversation.recentContext())
-                val response = parseModelResponse(raw)
-                var spoken: String
-                if (response.kind == "tool" && toolExecutor != null && response.toolName != null) {
-                    val toolResult = toolExecutor.execute(response.toolName, response.toolArgs)
-                    when (toolResult) {
-                        is ToolResult.Navigation -> {
-                            spoken = toolResult.summary
-                            onNavigate(toolResult.documentId)
-                        }
-                        is ToolResult.Success -> {
-                            val followUp = modelManager.callWithToolResult(
-                                userText, response.toolName, toolResult.summary, conversation.recentContext()
-                            )
-                            val followUpResponse = parseModelResponse(followUp)
-                            spoken = followUpResponse.text ?: toolResult.summary
-                        }
-                        is ToolResult.Error -> {
-                            spoken = toolResult.message
-                        }
-                    }
-                } else {
-                    spoken = spokenTextFor(response)
-                }
-                conversation.addTurn(userText, raw, spoken)
+                val spoken = session.ask(userText)
                 lastResponse = spoken
                 assistantState = AssistantState.Speaking
                 tts.speak(spoken)

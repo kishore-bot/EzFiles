@@ -38,8 +38,9 @@ static std::string generate(llama_model * mdl, const std::string & prompt, int m
     auto ctx_params = llama_context_default_params();
     // Otherwise large batches are still sent to the GPU even when no layers live there.
     ctx_params.op_offload = !cpu_only;
-    ctx_params.n_ctx = 1024;
-    ctx_params.n_batch = 1024;
+    // The training-format prompt (policy + tool schemas + state + a tool result) runs to ~1200 tokens.
+    ctx_params.n_ctx = 2048;
+    ctx_params.n_batch = 2048;
     // Small GPU submissions: one large prompt pass trips the Adreno watchdog (DeviceLost).
     ctx_params.n_ubatch = 64;
     ctx_params.n_threads = 4;

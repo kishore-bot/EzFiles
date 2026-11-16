@@ -7,7 +7,7 @@ import com.ezfiles.reader.data.FullTextIndex
 import com.ezfiles.reader.data.IndexEntry
 import com.ezfiles.reader.data.IndexHit
 import com.ezfiles.reader.data.LibraryContentSearch
-import com.ezfiles.reader.data.PagedText
+import com.ezfiles.reader.domain.PagedText
 import com.ezfiles.reader.data.appendCollapsed
 import com.ezfiles.reader.domain.DeviceDocuments
 import com.ezfiles.reader.domain.DocumentException

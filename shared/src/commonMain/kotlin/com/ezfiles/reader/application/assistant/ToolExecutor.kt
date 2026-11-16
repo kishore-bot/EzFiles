@@ -44,8 +44,12 @@ class ToolExecutor(
         val arguments = ids.resolveArguments(args ?: JsonObject(emptyMap()))
         return try {
             when (name) {
-                "searchLibrary" -> documents(actions.searchLibrary(libraryQuery(arguments), RESULT_LIMIT))
-                "searchDocuments" -> documents(actions.searchDocuments(arguments.string("query").orEmpty(), RESULT_LIMIT))
+                "searchLibrary" -> libraryQuery(arguments).let { query ->
+                    documents(withContentFallback(query.query, actions.searchLibrary(query, RESULT_LIMIT)))
+                }
+                "searchDocuments" -> arguments.string("query").orEmpty().let { query ->
+                    documents(withContentFallback(query, actions.searchDocuments(query, RESULT_LIMIT)))
+                }
                 "listRecentDocuments" -> documents(actions.listRecentDocuments(RESULT_LIMIT))
                 "getDocumentInfo" -> documentInfo(arguments.required("documentId"))
                 "getDocumentExcerpt" -> excerpt(arguments.required("documentId"), arguments.int("maxChars"))
@@ -90,6 +94,11 @@ class ToolExecutor(
             failed("not_available")
         }
     }
+
+    /** No file name matched: look inside files ("the one that mentions INR 48,000"), if text may be read. */
+    private suspend fun withContentFallback(query: String, byName: AssistantDocumentResults): AssistantDocumentResults =
+        if (byName.documents.isNotEmpty() || query.isBlank() || !actions.access.contentAccess.value) byName
+        else actions.searchContent(query, RESULT_LIMIT).takeIf { it.documents.isNotEmpty() } ?: byName
 
     private fun documents(results: AssistantDocumentResults): String = buildJsonObject {
         put("documents", JsonArray(results.documents.map { doc ->

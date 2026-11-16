@@ -55,6 +55,7 @@ import com.ezfiles.reader.domain.DocumentFormat
 import com.ezfiles.reader.platform.rememberDocumentDelivery
 import com.ezfiles.reader.presentation.components.EzTextButton
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.IO
 import kotlinx.coroutines.withContext
@@ -177,6 +178,9 @@ class AppDependencies internal constructor(
 @OptIn(ExperimentalTime::class)
 internal fun currentTimeMillis(): Long = Clock.System.now().toEpochMilliseconds()
 
+/** After the viewer has drawn its first page, so reading for Fily does not compete with it. */
+private const val PREFETCH_DELAY_MS = 2_000L
+
 private val OriginSaver = listSaver<DocumentRef?, Any?>(
     save = { ref -> if (ref == null) emptyList() else listOf(ref.uri, ref.displayName, ref.sizeBytes, ref.modifiedAt, ref.identity) },
     restore = { saved ->
@@ -289,6 +293,17 @@ fun App(
             val openDocument = (state as? ReaderUiState.Ready)?.ref ?: (state as? ReaderUiState.Playing)?.ref
             LaunchedEffect(openDocument) {
                 dependencies.filySession?.openDocumentId = openDocument?.let(dependencies.assistantActions::documentId)
+                // With text access on, read the open file once for Fily, after the viewer has drawn,
+                // so questions about it answer without re-reading the file.
+                if (openDocument == null || dependencies.filySession == null || !dependencies.assistantAccess.contentAccess.value) return@LaunchedEffect
+                delay(PREFETCH_DELAY_MS)
+                try {
+                    dependencies.assistantActions.prefetchText(openDocument)
+                } catch (cancelled: CancellationException) {
+                    throw cancelled
+                } catch (_: Exception) {
+                    // Unreadable, encrypted or out of scope: a question will say so when asked.
+                }
             }
             var tool by rememberSaveable { mutableStateOf<CreateTool?>(null) }
             var createSheet by rememberSaveable { mutableStateOf(false) }

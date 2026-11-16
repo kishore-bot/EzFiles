@@ -1,7 +1,7 @@
 package com.ezfiles.reader.application.assistant
 
 import com.ezfiles.reader.presentation.viewers.parseCellAddress
-import com.ezfiles.reader.presentation.viewers.spokenNumber
+import com.ezfiles.reader.domain.spokenNumber
 import kotlinx.coroutines.test.runTest
 import kotlin.test.Test
 import kotlin.test.assertEquals

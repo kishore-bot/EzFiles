@@ -41,6 +41,18 @@ class PassagesTest {
     }
 
     @Test
+    fun pdfPassagesCarryTheirPageAndAPageCanBeAskedFor() {
+        val pages = listOf("Cover page of the agreement.", "General terms apply.", "Payment: INR 48,000 due on signing.")
+        val starts = pages.runningFold(0) { at, page -> at + page.length + 1 }.dropLast(1)
+        val text = pages.joinToString("\n")
+        val (found, _) = Passages.select(text + "\n" + "Filler text. ".repeat(200), "how much is the payment", 120, starts)
+        assertTrue(found.startsWith("[page 3] Payment"), found)
+        val (page, _) = Passages.select(text, "what does page two say", 500, starts)
+        assertEquals("[page 2] General terms apply.", page)
+        assertTrue(Passages.select(text, "what does page 9 say about payment", 500, starts).first.contains("INR 48,000"))
+    }
+
+    @Test
     fun grammarOffersOnlyTheGivenTools() {
         val grammar = FilyGrammar.forTools(listOf("openDocument"))
         assertTrue("""name ::= "\"openDocument\""""" in grammar)

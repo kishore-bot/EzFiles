@@ -1,0 +1,135 @@
+package com.ezfiles.reader.application.assistant
+
+import com.ezfiles.reader.data.BookmarksStore
+import com.ezfiles.reader.data.RecentDocumentsStore
+import com.ezfiles.reader.domain.DeviceDocuments
+import com.ezfiles.reader.domain.DocumentRef
+import com.ezfiles.reader.domain.DocumentText
+import com.ezfiles.reader.domain.LibraryFolder
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.test.runTest
+import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.jsonArray
+import kotlinx.serialization.json.jsonObject
+import kotlinx.serialization.json.jsonPrimitive
+import kotlin.test.Test
+import kotlin.test.assertEquals
+import kotlin.test.assertTrue
+
+private class FilyDevice(refs: List<DocumentRef>) : DeviceDocuments {
+    override val supportsFolders = true
+    override val folders = MutableStateFlow<List<LibraryFolder>>(emptyList())
+    override val files = MutableStateFlow(refs)
+    override val scanning = MutableStateFlow(false)
+    override val limitReached = MutableStateFlow(false)
+    override suspend fun refresh() = Unit
+    override suspend fun addFolder(uri: String) = false
+    override suspend fun removeFolder(uri: String) = Unit
+}
+
+private class FilyFixture(refs: List<DocumentRef>) {
+    val access = AssistantAccess(AssistantMemoryStorage()).apply { setEnabled(true) }
+    val navigation = AssistantNavigation()
+    val actions = AssistantActions(
+        FilyDevice(refs),
+        RecentDocumentsStore(AssistantMemoryStorage()) { 1L },
+        access,
+        opaqueId = { "id-${it.displayName}" },
+        validateRef = { true },
+        documentText = object : DocumentText {
+            override suspend fun plainText(ref: DocumentRef, maxChars: Int): String? = "Amount due: INR 2812."
+        },
+        bookmarks = BookmarksStore(AssistantMemoryStorage()),
+    )
+    val tools = ToolExecutor(actions, navigation)
+}
+
+private fun doc(name: String, modified: Long? = null) = DocumentRef("content://t/$name", name, sizeBytes = 10, modifiedAt = modified, identity = name)
+
+private fun json(text: String): JsonObject = Json.parseToJsonElement(text).jsonObject
+
+class FilySessionTest {
+    @Test
+    fun promptFollowsTheTrainingLayout() {
+        val system = FilyPrompt.system(listOf("openDocument"))
+        assertTrue(system.startsWith(FilyPrompt.POLICY + "\nTOOLS={\"openDocument\":{"))
+        val state = FilyPrompt.appState(true, false, "2026-11-16", FilyScreen("d1", pageCount = 12, readerCapabilities = listOf("next_page")))
+        assertEquals(
+            """APP_STATE={"enabled":true,"contentAllowed":false,"today":"2026-11-16","authorizedIds":["d1"],"selectedDocumentId":"d1","pageCount":12,"readerCapabilities":["next_page"]}""",
+            state,
+        )
+        val prompt = FilyPrompt.render("S", listOf(FilyTurn(FilyRole.User, "hi"), FilyTurn(FilyRole.Tool, "{}")))
+        assertEquals("<|im_start|>system\nS<|im_end|>\n<|im_start|>user\nhi<|im_end|>\n<|im_start|>tool\n{}<|im_end|>\n<|im_start|>assistant\n", prompt)
+    }
+
+    @Test
+    fun selectorOffersFewRelevantTools() {
+        val all = FilyPrompt.toolNames
+        val library = ToolSelector.select("find my latest CV", FilyScreen(), all)
+        assertTrue("searchLibrary" in library)
+        assertTrue(library.size in 2..5)
+        assertTrue("controlReader" !in ToolSelector.select("next page", FilyScreen(), all))
+        assertTrue("controlReader" in ToolSelector.select("next page", FilyScreen("d", readerCapabilities = listOf("next_page")), all))
+    }
+
+    @Test
+    fun latestResumeUsesCategoryAndModifiedTime() = runTest {
+        val f = FilyFixture(listOf(doc("old-resume.pdf", 1L), doc("notes.txt", 9L), doc("Kishore_CV.pdf", 5L)))
+        val result = json(f.tools.execute("searchLibrary", json("""{"query":"","category":"resume","sort":"modified_desc"}""")))
+        val names = result["documents"]!!.jsonArray.map { it.jsonObject["name"]!!.jsonPrimitive.content }
+        assertEquals(listOf("Kishore_CV.pdf", "old-resume.pdf"), names)
+    }
+
+    @Test
+    fun openingGoesThroughAssistantNavigation() = runTest {
+        val f = FilyFixture(listOf(doc("resume.pdf")))
+        val result = json(f.tools.execute("openDocument", json("""{"documentId":"id-resume.pdf"}""")))
+        assertEquals("opened", result["status"]!!.jsonPrimitive.content)
+        assertEquals("resume.pdf", f.navigation.pending.value?.ref?.displayName)
+        assertEquals(AssistantAction.Open, f.navigation.pending.value?.action)
+    }
+
+    @Test
+    fun failuresComeBackAsJsonNotExceptions() = runTest {
+        val f = FilyFixture(listOf(doc("a.pdf")))
+        assertEquals("not_available", json(f.tools.execute("openDocument", json("""{"documentId":"foreign"}""")))["reason"]!!.jsonPrimitive.content)
+        assertEquals("missing_arguments", json(f.tools.execute("openDocument", null))["reason"]!!.jsonPrimitive.content)
+        f.access.setEnabled(false)
+        assertEquals("access_off", json(f.tools.execute("searchLibrary", json("""{"query":"a","sort":"relevance"}""")))["reason"]!!.jsonPrimitive.content)
+    }
+
+    @Test
+    fun toolResultIsFedBackForAGroundedReply() = runTest {
+        val f = FilyFixture(listOf(doc("resume.pdf")))
+        val prompts = ArrayList<String>()
+        val replies = ArrayDeque(listOf(
+            """{"kind":"tool","name":"searchLibrary","arguments":{"query":"resume","sort":"relevance"}}""",
+            """{"kind":"reply","text":"I found resume.pdf.","citations":["id-resume.pdf"]}""",
+        ))
+        val session = FilySession({ prompts += it; replies.removeFirst() }, f.tools, f.access, today = { "2026-11-16" })
+        assertEquals("I found resume.pdf.", session.ask("find my resume"))
+        assertTrue(prompts[1].contains("<|im_start|>tool\n{\"documents\":[{\"id\":\"id-resume.pdf\",\"name\":\"resume.pdf\"}],\"partial\":false}<|im_end|>"))
+        assertTrue(prompts[1].contains("<|im_start|>assistant\n{\"kind\":\"tool\",\"name\":\"searchLibrary\""))
+    }
+
+    @Test
+    fun toolsTheModelWasNotOfferedAreRefused() = runTest {
+        val f = FilyFixture(listOf(doc("resume.pdf")))
+        val replies = ArrayDeque(listOf(
+            """{"kind":"tool","name":"openBookmark","arguments":{"bookmarkId":"b"}}""",
+            """{"kind":"reply","text":"I can't do that here.","citations":[]}""",
+        ))
+        val session = FilySession({ replies.removeFirst() }, f.tools, f.access, today = { "2026-11-16" })
+        assertEquals("I can't do that here.", session.ask("hello there"))
+        assertEquals(null, f.navigation.pending.value)
+    }
+
+    @Test
+    fun isoDatesRoundTrip() {
+        val millis = parseIsoDate("2026-11-16")!!
+        assertEquals("2026-11-16", isoDate(millis))
+        assertEquals("1969-12-31", isoDate(-1))
+        assertEquals(null, parseIsoDate("16/11/2026"))
+    }
+}

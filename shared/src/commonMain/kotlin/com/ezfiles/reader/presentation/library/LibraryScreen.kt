@@ -87,9 +87,8 @@ import com.ezfiles.reader.presentation.theme.libraryBackground
 import com.ezfiles.reader.presentation.theme.appSafeArea
 import com.ezfiles.reader.presentation.theme.pressScale
 import com.ezfiles.reader.presentation.assistant.VoiceAssistantSheet
-import com.ezfiles.reader.application.assistant.ConversationManager
+import com.ezfiles.reader.application.assistant.FilySession
 import com.ezfiles.reader.application.assistant.ModelManager
-import com.ezfiles.reader.application.assistant.ToolExecutor
 import com.ezfiles.reader.platform.rememberMicPermission
 
 @Composable
@@ -102,7 +101,7 @@ fun LibraryScreen(
     /** The info button (top right); null hides it. */
     onOpenAbout: (() -> Unit)? = null,
     modelManager: ModelManager? = null,
-    toolExecutor: ToolExecutor? = null,
+    filySession: FilySession? = null,
     /** The Bookmarks tab's content; null shows a short explanation instead. */
     bookmarksContent: (@Composable () -> Unit)? = null,
     /** A file found by its text, with the PDF page (from 0) the match is on, if known. */
@@ -134,7 +133,7 @@ fun LibraryScreen(
         onAddFolderFailureSeen = viewModel::onAddFolderFailureSeen,
         onOpenAbout = onOpenAbout,
         modelManager = modelManager,
-        toolExecutor = toolExecutor,
+        filySession = filySession,
         bookmarksContent = bookmarksContent,
         onOpenHit = { onOpenHit(it.item.ref, it.page) },
         searchInput = searchInput,
@@ -159,7 +158,7 @@ fun LibraryScreen(
     onAddFolderFailureSeen: () -> Unit,
     onOpenAbout: (() -> Unit)? = null,
     modelManager: ModelManager? = null,
-    toolExecutor: ToolExecutor? = null,
+    filySession: FilySession? = null,
     bookmarksContent: (@Composable () -> Unit)? = null,
     onOpenHit: (ContentItem) -> Unit = { onOpen(it.item.ref) },
     searchInput: String = state.query,
@@ -421,17 +420,14 @@ fun LibraryScreen(
             dismissButton = { EzTextButton("Cancel", { confirmingClear = false }, color = EzColors.TextSecondary) },
         )
     }
-    if (voiceOpen && modelManager != null) {
-        val conversation = remember { ConversationManager() }
+    if (voiceOpen && modelManager != null && filySession != null) {
         VoiceAssistantSheet(
             onDismiss = {
                 voiceOpen = false
-                conversation.clear()
+                filySession.clear()
             },
             modelManager = modelManager,
-            conversation = conversation,
-            toolExecutor = toolExecutor,
-            onNavigate = { /* TODO: resolve documentId and open */ },
+            session = filySession,
         )
     }
     if (state.addFolderFailed) {

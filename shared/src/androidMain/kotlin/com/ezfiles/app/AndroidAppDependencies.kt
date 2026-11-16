@@ -4,7 +4,11 @@ import android.content.Context
 import com.ezfiles.reader.application.DocumentGlancer
 import com.ezfiles.reader.application.assistant.AssistantAccess
 import com.ezfiles.reader.application.assistant.AssistantActions
+import com.ezfiles.reader.application.assistant.AssistantNavigation
 import com.ezfiles.reader.application.assistant.AssistantTidyActions
+import com.ezfiles.reader.application.assistant.FilySession
+import com.ezfiles.reader.application.assistant.ModelManager
+import com.ezfiles.reader.application.assistant.ToolExecutor
 import com.ezfiles.reader.data.androidDocumentIdentity
 import android.net.Uri
 import java.security.MessageDigest
@@ -125,6 +129,14 @@ private fun createAndroidAppDependencies(context: Context, assistantAccess: Assi
         bookmarks = bookmarks,
     )
     val tidy = TidyService(device, documentText, AndroidTidyFiles(app), tidyEngine, tidyCache, tidyThread, ::currentTimeMillis)
+    val assistantNavigation = AssistantNavigation()
+    val modelManager = ModelManager()
+    val filySession = FilySession(
+        { prompt -> modelManager.complete(prompt) },
+        ToolExecutor(assistantActions, assistantNavigation),
+        assistantAccess,
+        today = { java.time.LocalDate.now().toString() },
+    )
     return AppDependencies(
         reader = reader,
         recents = recents,
@@ -141,6 +153,7 @@ private fun createAndroidAppDependencies(context: Context, assistantAccess: Assi
         appInfo = AndroidAppInfo(app),
         assistantAccess = assistantAccess,
         assistantActions = assistantActions,
+        assistantNavigation = assistantNavigation,
         startupReady = device.initialMetadataReady,
         assistantTidy = AssistantTidyActions(assistantAccess, device,
             loadReport = { tidy.load(); tidy.report.value }, validateRef = { validateAssistantDocument(app, it) }),
@@ -152,8 +165,8 @@ private fun createAndroidAppDependencies(context: Context, assistantAccess: Assi
         sensitiveCheck = SensitiveCheck(documentText, tidyEngine, tidyCache, Dispatchers.IO),
         glancer = DocumentGlancer(documentText, RustGlanceEngine, Dispatchers.Default),
         documentEditor = AndroidDocumentEditor(app),
-        modelManager = com.ezfiles.reader.application.assistant.ModelManager(),
-        toolExecutor = com.ezfiles.reader.application.assistant.ToolExecutor(assistantActions),
+        modelManager = modelManager,
+        filySession = filySession,
     )
 }
 

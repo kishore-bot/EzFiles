@@ -1,5 +1,6 @@
 package com.ezfiles.reader.presentation.viewers
 
+import com.ezfiles.reader.domain.spokenNumber
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut

@@ -2,7 +2,10 @@ package com.ezfiles.reader.application.assistant
 
 import com.ezfiles.reader.data.BookmarksStore
 import com.ezfiles.reader.data.RecentDocumentsStore
+import com.ezfiles.reader.domain.ContentHit
+import com.ezfiles.reader.domain.ContentSearch
 import com.ezfiles.reader.domain.DeviceDocuments
+import com.ezfiles.reader.domain.IndexProgress
 import com.ezfiles.reader.domain.DocumentRef
 import com.ezfiles.reader.domain.DocumentText
 import com.ezfiles.reader.domain.LibraryFolder
@@ -119,6 +122,33 @@ class FilySessionTest {
         assertEquals("doc_2", json(f.tools.execute("openDocument", json("""{"documentId":"doc_2"}""")))["documentId"]!!.jsonPrimitive.content)
         assertEquals("b-resume.pdf", f.navigation.pending.value?.ref?.displayName)
         assertEquals("not_available", json(f.tools.execute("openDocument", json("""{"documentId":"doc_9"}""")))["reason"]!!.jsonPrimitive.content)
+    }
+
+    @Test
+    fun aQuestionAboutContentFallsBackToTheContentIndex() = runTest {
+        val f = FilyFixture(listOf(doc("contract.pdf"), doc("notes.txt")))
+        val withIndex = ToolExecutor(
+            AssistantActions(
+                FilyDevice(listOf(doc("contract.pdf"), doc("notes.txt"))),
+                RecentDocumentsStore(AssistantMemoryStorage()) { 1L },
+                f.access, opaqueId = { "id-${it.displayName}" }, validateRef = { true },
+                documentText = object : DocumentText { override suspend fun plainText(ref: DocumentRef, maxChars: Int): String? = null },
+                bookmarks = BookmarksStore(AssistantMemoryStorage()),
+                contentSearch = object : ContentSearch {
+                    override val progress = MutableStateFlow(IndexProgress(0, 0))
+                    override fun setActive(active: Boolean) = Unit
+                    override suspend fun search(query: String, limit: Int) =
+                        if ("48,000" in query) listOf(ContentHit(doc("contract.pdf"), "INR 48,000", emptyList(), 2)) else emptyList()
+                    override suspend fun clear() = Unit
+                },
+            ),
+            AssistantNavigation(),
+        )
+        val search = json("""{"query":"48,000","sort":"relevance"}""")
+        assertEquals("[]", json(withIndex.execute("searchLibrary", search))["documents"].toString())
+        f.access.setContentAccess(true)
+        val found = json(withIndex.execute("searchLibrary", search))["documents"]!!.jsonArray
+        assertEquals("contract.pdf", found.single().jsonObject["name"]!!.jsonPrimitive.content)
     }
 
     @Test

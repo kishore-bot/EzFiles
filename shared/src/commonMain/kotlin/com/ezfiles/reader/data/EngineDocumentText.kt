@@ -6,6 +6,7 @@ import com.ezfiles.engine.ffi.NativeTextReader
 import com.ezfiles.engine.ffi.textReaderOpenFd
 import com.ezfiles.reader.domain.DocumentRef
 import com.ezfiles.reader.domain.DocumentText
+import com.ezfiles.reader.domain.PagedText
 import com.ezfiles.reader.domain.ReadLimits
 import com.ezfiles.reader.platform.PdfOpener
 import com.ezfiles.reader.platform.PdfPages
@@ -22,9 +23,6 @@ import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
-/** A document's plain text, and where each PDF page starts in it (empty for other files). */
-internal class PagedText(val text: String, val pageStarts: List<Int>)
-
 /**
  * [DocumentText] read by the Rust engine straight from a descriptor: no block
  * objects are built, and reading stops once [DocumentText.plainText]'s
@@ -40,6 +38,9 @@ internal class EngineDocumentText(
 
     override suspend fun plainText(ref: DocumentRef, maxChars: Int): String? =
         read(ref, maxChars)?.text?.takeIf { it.isNotBlank() }
+
+    override suspend fun pagedText(ref: DocumentRef, maxChars: Int): PagedText? =
+        read(ref, maxChars)?.takeIf { it.text.isNotBlank() }
 
     /** Like [plainText], with PDF page starts; `null` when unreadable. Rethrows cancellation. */
     suspend fun read(ref: DocumentRef, maxChars: Int): PagedText? {

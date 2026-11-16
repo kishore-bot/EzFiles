@@ -128,6 +128,7 @@ private fun createAndroidAppDependencies(context: Context, assistantAccess: Assi
         validateRef = { ref -> validateAssistantDocument(app, ref) },
         documentText = documentText,
         bookmarks = bookmarks,
+        contentSearch = contentSearch,
     )
     val tidy = TidyService(device, documentText, AndroidTidyFiles(app), tidyEngine, tidyCache, tidyThread, ::currentTimeMillis)
     val assistantNavigation = AssistantNavigation()

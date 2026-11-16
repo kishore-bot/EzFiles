@@ -2,12 +2,16 @@ package com.ezfiles.reader.application.assistant
 
 import com.ezfiles.reader.domain.BookmarkLocation
 import com.ezfiles.reader.domain.Bookmarks
+import com.ezfiles.reader.domain.ContentSearch
 import com.ezfiles.reader.domain.DeviceDocuments
 import com.ezfiles.reader.domain.DocumentRef
 import com.ezfiles.reader.domain.DocumentText
+import com.ezfiles.reader.domain.PagedText
 import com.ezfiles.reader.domain.RecentDocuments
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.ensureActive
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withTimeoutOrNull
 
 data class AssistantDocument(val id: String, val name: String, val sizeBytes: Long?, val modifiedAt: Long?)
@@ -42,6 +46,8 @@ class AssistantActions internal constructor(
     private val validateRef: suspend (DocumentRef) -> Boolean,
     private val documentText: DocumentText,
     private val bookmarks: Bookmarks,
+    /** Search inside files, for when no file name matches; null where there is no index. */
+    private val contentSearch: ContentSearch? = null,
 ) {
     suspend fun searchDocuments(query: String = "", limit: Int = 0): AssistantDocumentResults = access.authorized { token ->
         require(query.length <= MAX_QUERY_CHARS) { "Search text is too long." }
@@ -170,10 +176,49 @@ class AssistantActions internal constructor(
     suspend fun getRelevantPassages(documentId: String, question: String, maxChars: Int): AssistantExcerpt = access.authorized(content = true) { token ->
         val ref = resolve(snapshot(token), documentId, token)
         val count = maxChars.coerceIn(1, MAX_EXCERPT_CHARS)
-        val text = withTimeoutOrNull(TEXT_TIMEOUT_MS) { documentText.plainText(ref, MAX_SEARCH_CHARS) }
+        val text = cachedText(ref, TEXT_TIMEOUT_MS)
         checkStillReadable(ref, token)
-        val (selected, partial) = Passages.select(text.orEmpty(), question.take(MAX_QUERY_CHARS), count)
+        val (selected, partial) = Passages.select(text?.text.orEmpty(), question.take(MAX_QUERY_CHARS), count, text?.pageStarts.orEmpty())
         AssistantExcerpt(metadata(ref), selected, text != null, partial)
+    }
+
+    /**
+     * Reads a document the user just opened into the text cache, so questions about it answer
+     * without re-reading the file. Same checks as reading it for a question; nothing is returned.
+     */
+    suspend fun prefetchText(ref: DocumentRef): Unit = access.authorized(content = true) { token ->
+        val current = resolve(snapshot(token), opaqueId(ref), token)
+        cachedText(current, PREFETCH_TIMEOUT_MS)
+    }
+
+    /** Files whose text matches [query], from the library's content index; names only, no text. */
+    suspend fun searchContent(query: String, limit: Int = 0): AssistantDocumentResults = access.authorized(content = true) { token ->
+        require(query.isNotBlank() && query.length <= MAX_QUERY_CHARS) { "Enter between 1 and 256 search characters." }
+        val snapshot = snapshot(token)
+        val hits = contentSearch?.search(query, MAX_RESULT_CANDIDATES).orEmpty()
+        val allowed = snapshot.refs.associateBy(opaqueId)
+        val refs = hits.mapNotNull { allowed[opaqueId(it.ref)] }.distinctBy(opaqueId)
+        val readable = readable(refs, token, resultLimit(limit))
+        // The index is built in the background and may not cover every file yet.
+        AssistantDocumentResults(readable.refs.map(::metadata), partial = true)
+    }
+
+    private data class CachedText(val key: String, val text: PagedText)
+
+    private val textCache = ArrayDeque<CachedText>()
+    private val textLock = Mutex()
+
+    /** Text kept for the last two documents read; a changed file or access setting misses the cache. */
+    private suspend fun cachedText(ref: DocumentRef, timeoutMs: Long): PagedText? {
+        val key = "${access.generation}|${opaqueId(ref)}|${ref.sizeBytes}|${ref.modifiedAt}"
+        textLock.withLock { textCache.firstOrNull { it.key == key }?.let { return it.text } }
+        val text = withTimeoutOrNull(timeoutMs) { documentText.pagedText(ref, MAX_SEARCH_CHARS) } ?: return null
+        textLock.withLock {
+            textCache.removeAll { it.key == key }
+            textCache.addFirst(CachedText(key, text))
+            while (textCache.size > TEXT_CACHE_DOCUMENTS) textCache.removeLast()
+        }
+        return text
     }
 
     suspend fun findTextInDocument(documentId: String, query: String, limit: Int = 0): AssistantTextMatches = access.authorized(content = true) { token ->
@@ -280,5 +325,8 @@ class AssistantActions internal constructor(
         const val REFRESH_TIMEOUT_MS = 5000L
         const val RESULT_TIMEOUT_MS = 3000L
         const val TEXT_TIMEOUT_MS = 10_000L
+        /** A large PDF can take longer than a question should wait; prefetching can afford it. */
+        const val PREFETCH_TIMEOUT_MS = 60_000L
+        const val TEXT_CACHE_DOCUMENTS = 2
     }
 }

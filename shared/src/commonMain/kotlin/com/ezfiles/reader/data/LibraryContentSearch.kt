@@ -5,6 +5,7 @@ import com.ezfiles.reader.domain.ContentSearch
 import com.ezfiles.reader.domain.DeviceDocuments
 import com.ezfiles.reader.domain.DocumentRef
 import com.ezfiles.reader.domain.IndexProgress
+import com.ezfiles.reader.domain.PagedText
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.CoroutineExceptionHandler

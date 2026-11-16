@@ -62,8 +62,13 @@ import com.ezfiles.reader.presentation.theme.EzShapes
 import com.ezfiles.reader.presentation.theme.EzIcons
 import com.ezfiles.reader.presentation.theme.glass
 import com.ezfiles.reader.presentation.theme.rememberEzHaptics
+import com.ezfiles.reader.application.assistant.ReaderPosition
 import kotlinx.coroutines.awaitCancellation
+import kotlinx.coroutines.flow.MutableSharedFlow
+import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.launch
+
+private val PHOTO_VOICE_OPERATIONS = setOf("next_photo", "previous_photo", "zoom_in", "zoom_out", "rotate_photo")
 
 /** A single-file grant stays a single photo; a supplied authorized session enables paging. */
 @Composable
@@ -109,6 +114,24 @@ private fun PhotoGallery(refs: List<DocumentRef>, session: PhotoGallerySession?)
         savedUri = refs[selected].uri
         session?.select(selected)
     }
+    // Zoom and rotation belong to the photo on screen; it takes these as if pinched or tapped.
+    val photoCommands = remember { MutableSharedFlow<String>(extraBufferCapacity = 1) }
+    ReaderControlTarget(PHOTO_VOICE_OPERATIONS, ReaderPosition(page = pager.settledPage + 1, pageCount = refs.size)) { operation, _ ->
+        when (operation) {
+            "next_photo", "previous_photo" -> {
+                val target = pager.settledPage + if (operation == "next_photo") 1 else -1
+                if (target !in refs.indices) {
+                    if (operation == "next_photo") "at_last_photo" else "at_first_photo"
+                } else {
+                    buttonTarget = target
+                    haptics.pageTurn()
+                    if (reducedMotion) pager.scrollToPage(target) else pager.animateScrollToPage(target)
+                    null
+                }
+            }
+            else -> null.also { photoCommands.emit(operation) }
+        }
+    }
     LaunchedEffect(pager.settledPage, loadedUri, prefetchDirection) {
         val selected = pager.settledPage
         // Give the visible request priority and keep its prefetched bytes until it has consumed them.
@@ -147,11 +170,11 @@ private fun PhotoGallery(refs: List<DocumentRef>, session: PhotoGallerySession?)
                     ViewedImage.Unsupported -> ImageMessage("This photo is unavailable or this device can't display it. Choose another photo or open it again.")
                     ViewedImage.TooLarge -> ImageMessage("This photo is too large to display safely.")
                     is ViewedImage.Still -> if (active) {
-                        ZoomableImage(current.bitmap.width, current.bitmap.height, { pagingAllowed = it }) { modifier ->
+                        ZoomableImage(current.bitmap.width, current.bitmap.height, { pagingAllowed = it }, photoCommands) { modifier ->
                             Image(current.bitmap, ref.displayName, modifier = modifier, contentScale = ContentScale.Fit)
                         }
                     } else Image(current.bitmap, ref.displayName, modifier = Modifier.fillMaxSize(), contentScale = ContentScale.Fit)
-                    is ViewedImage.Animated -> ZoomableImage(current.animation.width, current.animation.height, { pagingAllowed = it }) { modifier ->
+                    is ViewedImage.Animated -> ZoomableImage(current.animation.width, current.animation.height, { pagingAllowed = it }, photoCommands.takeIf { active }) { modifier ->
                         AnimatedPicture(current.animation, ref.displayName, modifier)
                     }
                 }
@@ -208,7 +231,14 @@ private fun AnimatedPicture(animation: AnimatedImage, description: String, modif
 }
 
 @Composable
-private fun ZoomableImage(width: Int, height: Int, onPagingAllowed: (Boolean) -> Unit, content: @Composable (Modifier) -> Unit) {
+private fun ZoomableImage(
+    width: Int,
+    height: Int,
+    onPagingAllowed: (Boolean) -> Unit,
+    /** Assistant commands for the photo on screen: zoom_in, zoom_out, rotate_photo. */
+    commands: SharedFlow<String>?,
+    content: @Composable (Modifier) -> Unit,
+) {
     var zoom by remember { mutableFloatStateOf(1f) }
     var pan by remember { mutableStateOf(Offset.Zero) }
     var turns by remember { mutableIntStateOf(0) }
@@ -227,6 +257,17 @@ private fun ZoomableImage(width: Int, height: Int, onPagingAllowed: (Boolean) ->
         onPagingAllowed(zoom <= 1.001f && !multiplePointers)
     }
     DisposableEffect(Unit) { onDispose { onPagingAllowed(true) } }
+    LaunchedEffect(commands) {
+        commands?.collect { command ->
+            when (command) {
+                "zoom_in" -> zoom = (zoom * 1.5f).coerceIn(1f, 6f)
+                "zoom_out" -> zoom = (zoom / 1.5f).coerceIn(1f, 6f)
+                "rotate_photo" -> turns++
+            }
+            pan = clamp(pan)
+            onPagingAllowed(zoom <= 1.001f)
+        }
+    }
     Box(Modifier.fillMaxSize().onSizeChanged { viewport = it; pan = clamp(pan) }) {
         content(
             Modifier.fillMaxSize()

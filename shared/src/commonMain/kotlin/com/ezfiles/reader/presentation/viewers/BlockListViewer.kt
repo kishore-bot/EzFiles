@@ -90,6 +90,7 @@ private fun listIndexOf(grouped: List<List<DisplayItem>>, match: SearchMatch): I
 @Composable
 fun BlockListViewer(state: ReaderUiState.Ready, onLoadMore: () -> Unit, onRetry: () -> Unit, onEntryTap: ((String) -> Unit)? = null) {
     val listState = rememberLazyListState()
+    ListScrollControl(listState)
     LoadMoreWhenNearEnd(listState, state, onLoadMore)
     val readingText = !state.source && state.info.format == DocumentFormat.PlainText &&
         state.ref.displayName.substringAfterLast('.', "").lowercase() in setOf("txt", "text")

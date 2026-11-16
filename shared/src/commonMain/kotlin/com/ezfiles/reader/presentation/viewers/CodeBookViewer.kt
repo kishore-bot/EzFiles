@@ -61,6 +61,7 @@ private data class FoldRegion(val startLine: Int, val endLine: Int)
 fun CodeBookViewer(state: ReaderUiState.Ready, onLoadMore: () -> Unit, onRetry: () -> Unit, darkReading: Boolean = true) {
     val theme = if (darkReading) DarkBookColors else LightBookColors
     val listState = rememberLazyListState()
+    ListScrollControl(listState)
     LoadMoreWhenNearEnd(listState, state, onLoadMore)
 
     val allCode = remember(state.pages) {

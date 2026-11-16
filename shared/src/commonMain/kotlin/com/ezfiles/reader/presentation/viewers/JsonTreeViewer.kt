@@ -185,6 +185,7 @@ fun JsonTreeViewer(state: ReaderUiState.Ready, onLoadMore: () -> Unit, onRetry: 
 @Composable
 private fun JsonTreeContent(state: ReaderUiState.Ready, onLoadMore: () -> Unit, onRetry: () -> Unit) {
     val listState = rememberLazyListState()
+    ListScrollControl(listState)
     LoadMoreWhenNearEnd(listState, state, onLoadMore)
 
     val jsonText = remember(state.pages) {

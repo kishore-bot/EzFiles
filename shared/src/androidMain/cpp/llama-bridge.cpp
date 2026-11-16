@@ -1,19 +1,75 @@
 #include <jni.h>
 #include <android/log.h>
+#include <algorithm>
 #include <exception>
+#include <mutex>
 #include <string>
+#include <unordered_map>
 #include <vector>
+#include "ggml-backend.h"
 #include "llama.h"
 
 #define TAG "EzLlama"
 #define LOGI(...) __android_log_print(ANDROID_LOG_INFO, TAG, __VA_ARGS__)
 #define LOGE(...) __android_log_print(ANDROID_LOG_ERROR, TAG, __VA_ARGS__)
 
+static const int N_CTX = 2048;
+
 static llama_model * model = nullptr;
 static bool model_on_gpu = false;
 static std::string model_path_str;
 // Set once the GPU fails; every later call runs on this CPU copy instead.
 static llama_model * cpu_model = nullptr;
+
+/**
+ * One live context per model. Fily's model is a hybrid with recurrent layers, whose memory can be
+ * extended but not rewound to an earlier position, so a call either appends to what the context
+ * already holds, restores the snapshot of the shared prompt start, or starts again.
+ */
+struct Engine {
+    llama_context * ctx = nullptr;
+    bool cpu_only = false;
+    std::vector<llama_token> tokens;        // exactly what the context's memory holds
+    std::vector<llama_token> prefix_tokens; // the shared prompt start the snapshot holds
+    std::vector<uint8_t> prefix_state;
+    std::mutex lock;
+};
+
+static std::mutex engines_lock;
+static std::unordered_map<llama_model *, Engine *> engines;
+
+static void log_to_logcat(ggml_log_level level, const char * text, void *) {
+    if (level == GGML_LOG_LEVEL_DEBUG) return;
+    __android_log_print(level == GGML_LOG_LEVEL_ERROR ? ANDROID_LOG_ERROR : level == GGML_LOG_LEVEL_WARN ? ANDROID_LOG_WARN : ANDROID_LOG_INFO,
+                        "EzGgml", "%s", text);
+}
+
+// The CPU and GPU backends are separate libraries, loaded by name: that finds them whether the APK
+// keeps native libraries compressed inside it or extracted to disk.
+static void load_backends() {
+    static bool loaded = false;
+    if (loaded) return;
+    loaded = true;
+    llama_log_set(log_to_logcat, nullptr);
+    // Best first; a library the cores cannot run reports a zero score and is skipped.
+    static const char * cpu_libraries[] = {
+        "libggml-cpu-android_armv9.2_2.so", "libggml-cpu-android_armv9.2_1.so", "libggml-cpu-android_armv9.0_1.so",
+        "libggml-cpu-android_armv8.6_1.so", "libggml-cpu-android_armv8.2_2.so", "libggml-cpu-android_armv8.2_1.so",
+        "libggml-cpu-android_armv8.0_1.so", "libggml-cpu.so",
+    };
+    for (const char * name : cpu_libraries) {
+        if (ggml_backend_load(name) != nullptr) {
+            LOGI("CPU backend: %s", name);
+            break;
+        }
+    }
+    // Absent on x86_64 and on phones without a vendor OpenCL driver; the CPU still works.
+    if (ggml_backend_load("libggml-opencl.so") == nullptr) LOGI("No OpenCL backend");
+    for (size_t i = 0; i < ggml_backend_dev_count(); i++) {
+        auto * dev = ggml_backend_dev_get(i);
+        LOGI("Backend device: %s (%s)", ggml_backend_dev_name(dev), ggml_backend_dev_description(dev));
+    }
+}
 
 static llama_model * load(const std::string & path, bool gpu) {
     auto params = llama_model_default_params();
@@ -24,75 +80,124 @@ static llama_model * load(const std::string & path, bool gpu) {
     return llama_model_load_from_file(path.c_str(), params);
 }
 
-static void add_token(llama_batch & batch, llama_token token, int pos, bool logits) {
-    batch.token[batch.n_tokens] = token;
-    batch.pos[batch.n_tokens] = pos;
-    batch.n_seq_id[batch.n_tokens] = 1;
-    batch.seq_id[batch.n_tokens][0] = 0;
-    batch.logits[batch.n_tokens] = logits;
-    batch.n_tokens++;
+static Engine * engine_for(llama_model * mdl, bool cpu_only) {
+    std::lock_guard<std::mutex> guard(engines_lock);
+    auto found = engines.find(mdl);
+    if (found != engines.end()) return found->second;
+    auto params = llama_context_default_params();
+    params.n_ctx = N_CTX;
+    params.n_batch = N_CTX;
+    params.n_threads = 4;
+    params.n_threads_batch = 4;
+    params.no_perf = false;
+    // Otherwise large batches are still sent to the GPU even when no layers live there.
+    params.op_offload = !cpu_only;
+    llama_context * ctx = llama_init_from_model(mdl, params);
+    if (ctx == nullptr) return nullptr;
+    auto * engine = new Engine();
+    engine->ctx = ctx;
+    engine->cpu_only = cpu_only;
+    engines[mdl] = engine;
+    return engine;
 }
 
-// Throws whatever the backend throws (e.g. vk::DeviceLostError); the caller decides to fall back.
-static std::string generate(llama_model * mdl, const std::string & prompt, int max, bool cpu_only) {
-    auto ctx_params = llama_context_default_params();
-    // Otherwise large batches are still sent to the GPU even when no layers live there.
-    ctx_params.op_offload = !cpu_only;
-    // The training-format prompt (policy + tool schemas + state + a tool result) runs to ~1200 tokens.
-    ctx_params.n_ctx = 2048;
-    ctx_params.n_batch = 2048;
-    // Small GPU submissions: one large prompt pass trips the Adreno watchdog (DeviceLost).
-    ctx_params.n_ubatch = 64;
-    ctx_params.n_threads = 4;
-    ctx_params.n_threads_batch = 4;
+static void free_engine(llama_model * mdl) {
+    std::lock_guard<std::mutex> guard(engines_lock);
+    auto found = engines.find(mdl);
+    if (found == engines.end()) return;
+    llama_free(found->second->ctx);
+    delete found->second;
+    engines.erase(found);
+}
 
-    llama_context * ctx = llama_init_from_model(mdl, ctx_params);
-    if (ctx == nullptr) {
-        LOGE("Failed to create context");
-        return "{\"kind\":\"reply\",\"text\":\"Context creation failed.\"}";
+static std::vector<llama_token> tokenize(const llama_vocab * vocab, const std::string & text) {
+    int n = text.size() + 16;
+    std::vector<llama_token> tokens(n);
+    n = llama_tokenize(vocab, text.c_str(), text.size(), tokens.data(), n, true, true);
+    if (n < 0) {
+        tokens.resize(-n);
+        n = llama_tokenize(vocab, text.c_str(), text.size(), tokens.data(), -n, true, true);
     }
+    tokens.resize(std::max(n, 0));
+    return tokens;
+}
 
+// Decodes tokens[from, to) after what the context holds. Throws whatever the backend throws.
+static bool decode(Engine & e, const std::vector<llama_token> & tokens, size_t from, size_t to, bool logits_last) {
+    if (from >= to) return true;
+    llama_batch batch = llama_batch_init(to - from, 0, 1);
+    for (size_t i = from; i < to; i++) {
+        batch.token[batch.n_tokens] = tokens[i];
+        batch.pos[batch.n_tokens] = e.tokens.size() + (i - from);
+        batch.n_seq_id[batch.n_tokens] = 1;
+        batch.seq_id[batch.n_tokens][0] = 0;
+        batch.logits[batch.n_tokens] = logits_last && i == to - 1;
+        batch.n_tokens++;
+    }
+    int status = llama_decode(e.ctx, batch);
+    llama_batch_free(batch);
+    if (status != 0) return false;
+    e.tokens.insert(e.tokens.end(), tokens.begin() + from, tokens.begin() + to);
+    return true;
+}
+
+static void reset(Engine & e) {
+    llama_memory_clear(llama_get_memory(e.ctx), true);
+    e.tokens.clear();
+}
+
+/** Brings the context to the prompt's last token, reading as little of it as possible. */
+static bool prepare(Engine & e, const std::vector<llama_token> & prompt, const std::vector<llama_token> & stable) {
+    size_t common = 0;
+    while (common < e.tokens.size() && common < prompt.size() && e.tokens[common] == prompt[common]) common++;
+    if (common == e.tokens.size() && common < prompt.size()) {
+        return decode(e, prompt, common, prompt.size(), true);
+    }
+    reset(e);
+    bool stable_fits = !stable.empty() && stable.size() < prompt.size() && std::equal(stable.begin(), stable.end(), prompt.begin());
+    if (stable_fits && e.prefix_tokens == stable && !e.prefix_state.empty() &&
+        llama_state_seq_set_data(e.ctx, e.prefix_state.data(), e.prefix_state.size(), 0) > 0) {
+        e.tokens = stable;
+    } else if (stable_fits) {
+        if (!decode(e, prompt, 0, stable.size(), false)) return false;
+        e.prefix_state.resize(llama_state_seq_get_size(e.ctx, 0));
+        llama_state_seq_get_data(e.ctx, e.prefix_state.data(), e.prefix_state.size(), 0);
+        e.prefix_tokens = stable;
+    }
+    return decode(e, prompt, e.tokens.size(), prompt.size(), true);
+}
+
+static std::string generate(Engine & e, llama_model * mdl, const std::string & prompt, const std::string & stable_prefix, int max) {
+    std::lock_guard<std::mutex> guard(e.lock);
     auto vocab = llama_model_get_vocab(mdl);
-
-    int n_prompt_max = prompt.size() + 256;
-    std::vector<llama_token> tokens(n_prompt_max);
-    int n_tokens = llama_tokenize(vocab, prompt.c_str(), prompt.size(), tokens.data(), n_prompt_max, true, true);
-    if (n_tokens < 0) {
-        tokens.resize(-n_tokens);
-        n_tokens = llama_tokenize(vocab, prompt.c_str(), prompt.size(), tokens.data(), -n_tokens, true, true);
+    auto tokens = tokenize(vocab, prompt);
+    if (tokens.empty() || tokens.size() + max > N_CTX) {
+        LOGE("Prompt of %zu tokens does not fit", tokens.size());
+        return "{\"kind\":\"reply\",\"text\":\"That was too long for me. Try a shorter request.\",\"citations\":[]}";
     }
-    tokens.resize(n_tokens);
-    LOGI("Prompt tokens: %d", n_tokens);
-
-    llama_batch batch = llama_batch_init(n_tokens, 0, 1);
-    for (int i = 0; i < n_tokens; i++) add_token(batch, tokens[i], i, i == n_tokens - 1);
-
-    if (llama_decode(ctx, batch) != 0) {
+    llama_perf_context_reset(e.ctx);
+    size_t held = e.tokens.size();
+    if (!prepare(e, tokens, stable_prefix.empty() ? std::vector<llama_token>() : tokenize(vocab, stable_prefix))) {
         LOGE("Decode failed");
-        llama_batch_free(batch);
-        llama_free(ctx);
-        return "{\"kind\":\"reply\",\"text\":\"Decode failed.\"}";
+        reset(e);
+        return "{\"kind\":\"reply\",\"text\":\"Something went wrong. Try again.\",\"citations\":[]}";
     }
 
     std::string result;
     llama_token eos = llama_vocab_eos(vocab);
-    int n_vocab_size = llama_vocab_n_tokens(vocab);
-
+    int n_vocab = llama_vocab_n_tokens(vocab);
     for (int i = 0; i < max; i++) {
-        auto * logits = llama_get_logits_ith(ctx, batch.n_tokens - 1);
-
+        const float * logits = llama_get_logits_ith(e.ctx, -1);
         llama_token best = 0;
-        float best_logit = logits[0];
-        for (int v = 1; v < n_vocab_size; v++) {
-            if (logits[v] > best_logit) { best_logit = logits[v]; best = v; }
-        }
-        if (best == eos) break;
+        for (int v = 1; v < n_vocab; v++) if (logits[v] > logits[best]) best = v;
+        if (best == eos || llama_vocab_is_eog(vocab, best)) break;
 
         char buf[128];
         int len = llama_token_to_piece(vocab, best, buf, sizeof(buf), 0, true);
         if (len > 0) result.append(buf, len);
 
-        // Stop at the end of the first complete JSON object.
+        // Stop at the end of the first complete JSON object. That token is not decoded: the
+        // follow-up prompt carries it, so the context stays an exact prefix of the next prompt.
         int depth = 0;
         bool in_string = false;
         bool complete = false;
@@ -105,18 +210,37 @@ static std::string generate(llama_model * mdl, const std::string & prompt, int m
         }
         if (complete) break;
 
-        batch.n_tokens = 0;
-        add_token(batch, best, n_tokens + i, true);
-        if (llama_decode(ctx, batch) != 0) {
+        std::vector<llama_token> next = { best };
+        if (!decode(e, next, 0, 1, true)) {
             LOGE("Decode step %d failed", i);
             break;
         }
     }
 
-    llama_batch_free(batch);
-    llama_free(ctx);
+    auto perf = llama_perf_context(e.ctx);
+    LOGI("Timing: %zu prompt tok (%zu already held, %d read in %.0f ms), generated %d tok in %.0f ms (%.1f tok/s)",
+         tokens.size(), held, perf.n_p_eval, perf.t_p_eval_ms,
+         perf.n_eval, perf.t_eval_ms, perf.n_eval * 1000.0 / (perf.t_eval_ms + 1e-9));
     LOGI("Generated: %s", result.c_str());
     return result;
+}
+
+// Runs one token through the model so the first question doesn't pay for page-in and GPU setup;
+// a GPU that fails here falls back before the user asks anything.
+static void warm_up(Engine & e, llama_model * mdl) {
+    std::lock_guard<std::mutex> guard(e.lock);
+    std::vector<llama_token> bos = { llama_vocab_bos(llama_model_get_vocab(mdl)) };
+    decode(e, bos, 0, 1, true);
+    reset(e);
+}
+
+static bool switch_to_cpu() {
+    LOGI("GPU failed, falling back to CPU");
+    // A failed GPU context is left alone rather than risk another throw while tearing it down.
+    cpu_model = load(model_path_str, false);
+    if (cpu_model == nullptr) return false;
+    Engine * e = engine_for(cpu_model, true);
+    return e != nullptr;
 }
 
 extern "C" {
@@ -130,6 +254,7 @@ Java_com_ezfiles_reader_platform_LlamaBridge_loadModel(
     env->ReleaseStringUTFChars(path, model_path);
     LOGI("Loading model: %s (GPU=%d)", model_path_str.c_str(), useGpu);
 
+    load_backends();
     llama_backend_init();
     model = load(model_path_str, useGpu);
     model_on_gpu = useGpu;
@@ -137,48 +262,56 @@ Java_com_ezfiles_reader_platform_LlamaBridge_loadModel(
         LOGE("Failed to load model");
         return 0;
     }
+    Engine * e = engine_for(model, !useGpu);
+    if (e == nullptr) {
+        LOGE("Failed to create context");
+        return 0;
+    }
+    try {
+        warm_up(*e, model);
+    } catch (const std::exception & ex) {
+        LOGE("Warm-up threw: %s", ex.what());
+        if (!useGpu || !switch_to_cpu()) return 0;
+    }
     LOGI("Model loaded successfully");
     return reinterpret_cast<jlong>(model);
 }
 
 JNIEXPORT jstring JNICALL
 Java_com_ezfiles_reader_platform_LlamaBridge_runInference(
-    JNIEnv *env, jobject /* this */, jlong modelPtr, jstring prompt, jint maxTokens) {
+    JNIEnv *env, jobject /* this */, jlong modelPtr, jstring prompt, jint maxTokens, jstring stablePrefix) {
 
     auto *mdl = cpu_model != nullptr ? cpu_model : reinterpret_cast<llama_model *>(modelPtr);
     if (mdl == nullptr) {
-        return env->NewStringUTF("{\"kind\":\"reply\",\"text\":\"Model not loaded.\"}");
+        return env->NewStringUTF("{\"kind\":\"reply\",\"text\":\"Model not loaded.\",\"citations\":[]}");
     }
 
     const char *prompt_cstr = env->GetStringUTFChars(prompt, nullptr);
     std::string prompt_str(prompt_cstr);
     env->ReleaseStringUTFChars(prompt, prompt_cstr);
-    int max = maxTokens > 0 ? maxTokens : 512;
+    const char *stable_cstr = env->GetStringUTFChars(stablePrefix, nullptr);
+    std::string stable_str(stable_cstr);
+    env->ReleaseStringUTFChars(stablePrefix, stable_cstr);
+    int max = maxTokens > 0 ? maxTokens : 128;
 
+    Engine * e = engine_for(mdl, cpu_model != nullptr || !model_on_gpu);
+    if (e == nullptr) return env->NewStringUTF("{\"kind\":\"reply\",\"text\":\"Context creation failed.\",\"citations\":[]}");
     try {
-        return env->NewStringUTF(generate(mdl, prompt_str, max, cpu_model != nullptr || !model_on_gpu).c_str());
-    } catch (const std::exception & e) {
-        LOGE("Inference threw: %s", e.what());
+        return env->NewStringUTF(generate(*e, mdl, prompt_str, stable_str, max).c_str());
+    } catch (const std::exception & ex) {
+        LOGE("Inference threw: %s", ex.what());
     } catch (...) {
         LOGE("Inference threw an unknown error");
     }
 
-    if (cpu_model != nullptr) {
-        return env->NewStringUTF("{\"kind\":\"reply\",\"text\":\"Something went wrong. Try again.\"}");
-    }
-
-    // The GPU context is unusable after a device loss; the GPU model is left unfreed rather than
-    // risk another throw while tearing it down.
-    LOGI("GPU failed, falling back to CPU");
-    cpu_model = load(model_path_str, false);
-    if (cpu_model == nullptr) {
-        return env->NewStringUTF("{\"kind\":\"reply\",\"text\":\"Model failed to reload.\"}");
+    if (cpu_model != nullptr || !switch_to_cpu()) {
+        return env->NewStringUTF("{\"kind\":\"reply\",\"text\":\"Something went wrong. Try again.\",\"citations\":[]}");
     }
     try {
-        return env->NewStringUTF(generate(cpu_model, prompt_str, max, true).c_str());
-    } catch (const std::exception & e) {
-        LOGE("CPU inference threw: %s", e.what());
-        return env->NewStringUTF("{\"kind\":\"reply\",\"text\":\"Something went wrong. Try again.\"}");
+        return env->NewStringUTF(generate(*engine_for(cpu_model, true), cpu_model, prompt_str, stable_str, max).c_str());
+    } catch (const std::exception & ex) {
+        LOGE("CPU inference threw: %s", ex.what());
+        return env->NewStringUTF("{\"kind\":\"reply\",\"text\":\"Something went wrong. Try again.\",\"citations\":[]}");
     }
 }
 
@@ -187,11 +320,24 @@ Java_com_ezfiles_reader_platform_LlamaBridge_freeModel(
     JNIEnv *env, jobject /* this */, jlong modelPtr) {
 
     auto *mdl = reinterpret_cast<llama_model *>(modelPtr);
-    if (mdl != nullptr) llama_model_free(mdl);
-    if (cpu_model != nullptr) { llama_model_free(cpu_model); cpu_model = nullptr; }
+    if (mdl != nullptr) {
+        free_engine(mdl);
+        llama_model_free(mdl);
+    }
+    if (cpu_model != nullptr) {
+        free_engine(cpu_model);
+        llama_model_free(cpu_model);
+        cpu_model = nullptr;
+    }
     model = nullptr;
     LOGI("Model freed");
     llama_backend_free();
+}
+
+JNIEXPORT jboolean JNICALL
+Java_com_ezfiles_reader_platform_LlamaBridge_gpuFailed(
+    JNIEnv *env, jobject /* this */) {
+    return cpu_model != nullptr;
 }
 
 JNIEXPORT jstring JNICALL

@@ -52,6 +52,10 @@ android {
         // Also keeps out the 32-bit libraries ML Kit and JNA ship: the engine has none.
         if (!abiSplit) ndk.abiFilters += appAbis
     }
+    packaging {
+        // Built only so the OpenCL backend links; the phone's own driver library must be the one loaded.
+        jniLibs.excludes += "lib/*/libOpenCL.so"
+    }
     splits {
         abi {
             isEnable = abiSplit

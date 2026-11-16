@@ -5,7 +5,8 @@ package com.ezfiles.reader.application.assistant
  * prompt, never the whole catalog, and a short list also keeps the prompt fast to read.
  */
 internal object ToolSelector {
-    private const val MAX_TOOLS = 5
+    // Each schema costs 45-180 prompt tokens; training used 2-5.
+    private const val MAX_TOOLS = 4
 
     private val rules: List<Pair<Regex, List<String>>> = listOf(
         """\b(scan|scanner|camera)\b""" to listOf("openScanner"),

@@ -40,6 +40,9 @@ internal object FilyPrompt {
             "Ask before ambiguous selection; preserve explicit ordering. No cloud fallback, passwords or shell access. " +
             "A review handoff is not task completion. Proposed tools are training contracts only."
 
+    /** The start every prompt shares, whatever the tools and state; the engine caches it. */
+    const val STABLE_PREFIX = "<|im_start|>system\n$POLICY"
+
     private val catalog: JsonObject by lazy { Json.parseToJsonElement(FILY_TOOL_CATALOG).jsonObject }
 
     val toolNames: Set<String> get() = catalog.keys

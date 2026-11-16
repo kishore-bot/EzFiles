@@ -130,7 +130,12 @@ private fun createAndroidAppDependencies(context: Context, assistantAccess: Assi
     )
     val tidy = TidyService(device, documentText, AndroidTidyFiles(app), tidyEngine, tidyCache, tidyThread, ::currentTimeMillis)
     val assistantNavigation = AssistantNavigation()
-    val modelManager = ModelManager()
+    // Compiled GPU kernels are cached here; the engine's default temp folder does not exist on Android.
+    android.system.Os.setenv("GGML_OPENCL_KERNEL_CACHE_DIR", File(app.cacheDir, "opencl-kernels").path, true)
+    val modelManager = ModelManager(
+        storage,
+        buildStamp = app.packageManager.getPackageInfo(app.packageName, 0).lastUpdateTime.toString(),
+    )
     val filySession = FilySession(
         { prompt -> modelManager.complete(prompt) },
         ToolExecutor(assistantActions, assistantNavigation),

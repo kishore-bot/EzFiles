@@ -175,6 +175,34 @@ class FilySessionTest {
     }
 
     @Test
+    fun theNthFileOnScreenOpensWithoutTheModel() = runTest {
+        val f = FilyFixture(listOf(doc("notes.txt"), doc("resume.pdf")))
+        val session = FilySession({ _, _ -> error("the model must not be asked") }, f.tools, f.access, today = { "2026-11-16" })
+        session.listedFiles = { listOf(ListedFile("id-notes.txt", "notes.txt"), ListedFile("id-resume.pdf", "resume.pdf")) }
+        assertEquals("open the first file you see on screen",
+            session.bestTranscript(listOf("open the first five UC", "open the first file you see on screen")))
+        assertEquals("Opening notes.txt.", session.ask("open the first file UC on screen"))
+        assertEquals("notes.txt", f.navigation.pending.value?.ref?.displayName)
+        assertEquals("Opening resume.pdf.", session.ask("open the second one"))
+        assertEquals("Opening resume.pdf.", session.ask("open the last file"))
+        assertEquals("There are only 2 files on screen.", session.ask("open the fifth file"))
+    }
+
+    @Test
+    fun listPositionsAreOnlyForFiles() {
+        assertEquals(0, QuickCommands.listPosition("open the first file on screen"))
+        assertEquals(0, QuickCommands.listPosition("open the first file UC on screen"))
+        assertEquals(1, QuickCommands.listPosition("open the second one"))
+        assertEquals(2, QuickCommands.listPosition("open number three"))
+        assertEquals(2, QuickCommands.listPosition("open the 3rd file"))
+        assertEquals(-1, QuickCommands.listPosition("open the last one"))
+        assertEquals(null, QuickCommands.listPosition("open the first page"))
+        assertEquals(null, QuickCommands.listPosition("open invoice number 3"))
+        assertEquals(null, QuickCommands.listPosition("open the first contract about payments"))
+        assertEquals(null, QuickCommands.listPosition("find my latest CV"))
+    }
+
+    @Test
     fun toolsTheModelWasNotOfferedAreRefused() = runTest {
         val f = FilyFixture(listOf(doc("resume.pdf")))
         val replies = ArrayDeque(listOf(

@@ -3,6 +3,8 @@ package com.ezfiles.reader.data
 import com.ezfiles.reader.domain.DocumentRef
 import com.ezfiles.reader.domain.LibraryFolder
 import com.ezfiles.reader.domain.MEDIA_EXTENSIONS
+import com.ezfiles.reader.domain.SourceCodeExtensions
+import com.ezfiles.reader.domain.SourceCodeFileNames
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.ensureActive
 
@@ -92,8 +94,11 @@ internal suspend fun walkDocumentTree(trees: DocumentTrees, uri: String, rootId:
                     seen.add(entry.id) -> pending.addLast(entry.id to depth + 1)
                 }
                 entry.size == 0L -> Unit
-                else -> when (entry.name.substringAfterLast('.', "").lowercase()) {
-                    in DOCUMENT_EXTENSIONS, in MEDIA_EXTENSIONS -> if (documents < limits.maxDocuments) {
+                else -> when (val extension = entry.name.substringAfterLast('.', "").lowercase()) {
+                    in DOCUMENT_EXTENSIONS, in MEDIA_EXTENSIONS, in SourceCodeExtensions,
+                    // Makefile, Dockerfile and the like have no extension.
+                    "" -> if (extension.isEmpty() && entry.name.lowercase() !in SourceCodeFileNames) Unit
+                    else if (documents < limits.maxDocuments) {
                         documents++
                         refs += entry.toRef()
                     } else {

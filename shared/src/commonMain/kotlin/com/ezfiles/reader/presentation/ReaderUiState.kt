@@ -72,7 +72,9 @@ sealed interface ReaderUiState {
          */
         val canSwitchSource: Boolean
             get() = source || canPreviewHtml ||
-                info.format in setOf(DocumentFormat.Markdown, DocumentFormat.Json, DocumentFormat.Csv, DocumentFormat.SourceCode)
+                info.format in setOf(DocumentFormat.Markdown, DocumentFormat.Json, DocumentFormat.Csv, DocumentFormat.SourceCode) ||
+                // A .txt also opens as source (line numbers, monospace); logs and other text don't.
+                (info.format == DocumentFormat.PlainText && info.name.substringAfterLast('.', "").lowercase() in setOf("txt", "text"))
 
         /** Slides and images draw on a canvas, PDFs have their own reader, archives are only a listing. */
         val canSearch: Boolean

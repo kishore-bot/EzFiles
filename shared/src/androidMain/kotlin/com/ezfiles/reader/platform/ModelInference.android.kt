@@ -4,9 +4,9 @@ actual class ModelInference actual constructor() {
     private val bridge = LlamaBridge()
     private var modelPtr: Long = 0L
 
-    actual fun load(path: String, useGpu: Boolean): Boolean {
+    actual fun load(path: String, useGpu: Boolean, threads: Int, ubatch: Int, stablePrefix: String): Boolean {
         if (modelPtr != 0L) unload()
-        modelPtr = bridge.loadModel(path, useGpu)
+        modelPtr = bridge.loadModel(path, useGpu, threads, ubatch, stablePrefix)
         return modelPtr != 0L
     }
 

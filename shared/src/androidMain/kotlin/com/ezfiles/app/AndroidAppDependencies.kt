@@ -135,6 +135,10 @@ private fun createAndroidAppDependencies(context: Context, assistantAccess: Assi
         loadReport = { tidy.load(); tidy.report.value }, validateRef = { validateAssistantDocument(app, it) })
     // Compiled GPU kernels are cached here; the engine's default temp folder does not exist on Android.
     android.system.Os.setenv("GGML_OPENCL_KERNEL_CACHE_DIR", File(app.cacheDir, "opencl-kernels").path, true)
+    // Debug builds log kernel-cache HIT/MISS/SAVE, to tell first-run compiling from steady state.
+    if (app.applicationInfo.flags and android.content.pm.ApplicationInfo.FLAG_DEBUGGABLE != 0) {
+        android.system.Os.setenv("GGML_OPENCL_KERNEL_CACHE_DEBUG", "1", true)
+    }
     val modelManager = ModelManager(
         storage,
         buildStamp = app.packageManager.getPackageInfo(app.packageName, 0).lastUpdateTime.toString(),

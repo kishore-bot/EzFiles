@@ -13,6 +13,9 @@ import kotlinx.coroutines.withTimeoutOrNull
 
 enum class ModelState { Idle, Loading, Ready, Error }
 
+/** Engine threads and micro-batch size; the defaults are the measured CPU setting. */
+data class EngineSettings(val threads: Int = 4, val ubatch: Int = 512)
+
 /**
  * Loads Fily and runs it on one thread at a time. The GPU is tried at most once per install: a GPU
  * that throws, hangs or takes the app down is remembered, and later launches use the CPU.
@@ -25,22 +28,24 @@ class ModelManager internal constructor(
     private var inference = ModelInference()
     private var lane = newLane()
     private var path = ""
+    private var settings = EngineSettings()
     private var onGpu = false
     private var gpuProven = false
     private val _state = MutableStateFlow(ModelState.Idle)
     val state: StateFlow<ModelState> = _state
 
-    suspend fun load(modelPath: String, preferGpu: Boolean) {
+    suspend fun load(modelPath: String, preferGpu: Boolean, settings: EngineSettings = EngineSettings()) {
         path = modelPath
+        this.settings = settings
         _state.value = ModelState.Loading
         // Still "trying" means the last GPU attempt ended the process.
         if (storage.get(GPU_KEY) == "$buildStamp:$TRYING") storage.put(GPU_KEY, "$buildStamp:$BAD")
         onGpu = preferGpu && storage.get(GPU_KEY) != "$buildStamp:$BAD"
         if (onGpu && storage.get(GPU_KEY) != "$buildStamp:$PROVEN") storage.put(GPU_KEY, "$buildStamp:$TRYING")
-        var ok = withContext(lane) { inference.load(modelPath, onGpu) }
+        var ok = withContext(lane) { inference.load(modelPath, onGpu, settings.threads, settings.ubatch, FilyPrompt.STABLE_PREFIX) }
         if (onGpu && (!ok || inference.gpuFailed())) {
             gpuIsBad()
-            if (!ok) ok = withContext(lane) { inference.load(modelPath, false) }
+            if (!ok) ok = withContext(lane) { inference.load(modelPath, false, settings.threads, settings.ubatch, FilyPrompt.STABLE_PREFIX) }
         }
         _state.value = if (ok) ModelState.Ready else ModelState.Error
     }
@@ -64,7 +69,7 @@ class ModelManager internal constructor(
         // The GPU hung: start again on a fresh thread with a CPU-only engine.
         inference = ModelInference()
         lane = newLane()
-        if (!withContext(lane) { inference.load(path, false) }) {
+        if (!withContext(lane) { inference.load(path, false, settings.threads, settings.ubatch, FilyPrompt.STABLE_PREFIX) }) {
             _state.value = ModelState.Error
             return NOT_READY
         }

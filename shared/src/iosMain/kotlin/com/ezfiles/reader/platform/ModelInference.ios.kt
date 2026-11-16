@@ -1,7 +1,7 @@
 package com.ezfiles.reader.platform
 
 actual class ModelInference actual constructor() {
-    actual fun load(path: String, useGpu: Boolean): Boolean = false
+    actual fun load(path: String, useGpu: Boolean, threads: Int, ubatch: Int, stablePrefix: String): Boolean = false
     actual fun infer(prompt: String, maxTokens: Int, stablePrefix: String, grammar: String): String = "{\"kind\":\"reply\",\"text\":\"Not available on iOS.\"}"
     actual fun isLoaded(): Boolean = false
     actual fun unload() {}

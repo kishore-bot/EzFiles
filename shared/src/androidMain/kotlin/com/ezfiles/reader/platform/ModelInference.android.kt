@@ -10,9 +10,9 @@ actual class ModelInference actual constructor() {
         return modelPtr != 0L
     }
 
-    actual fun infer(prompt: String, maxTokens: Int): String {
+    actual fun infer(prompt: String, maxTokens: Int, stablePrefix: String): String {
         if (modelPtr == 0L) return "{\"kind\":\"reply\",\"text\":\"Model not loaded.\"}"
-        return bridge.runInference(modelPtr, prompt, maxTokens)
+        return bridge.runInference(modelPtr, prompt, maxTokens, stablePrefix)
     }
 
     actual fun isLoaded(): Boolean = modelPtr != 0L
@@ -25,4 +25,6 @@ actual class ModelInference actual constructor() {
     }
 
     actual fun systemInfo(): String = bridge.systemInfo()
+
+    actual fun gpuFailed(): Boolean = bridge.gpuFailed()
 }

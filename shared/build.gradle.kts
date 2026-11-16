@@ -76,10 +76,8 @@ android {
         externalNativeBuild {
             cmake {
                 arguments += listOf(
-                    "-DGGML_VULKAN=ON",
-                    "-DLLAMA_BUILD_TESTS=OFF",
-                    "-DLLAMA_BUILD_EXAMPLES=OFF",
-                    "-DLLAMA_BUILD_SERVER=OFF",
+                    // Inference is unusably slow at -O0; debug APKs still debug the Kotlin side.
+                    "-DCMAKE_BUILD_TYPE=Release",
                 )
             }
         }

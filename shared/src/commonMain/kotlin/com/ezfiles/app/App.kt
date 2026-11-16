@@ -232,8 +232,7 @@ fun App(
         if (mm.state.value == com.ezfiles.reader.application.assistant.ModelState.Idle) {
             mm.load(
                 modelPath = "/data/local/tmp/Fily-EzFiles-350M-Q8_0.gguf",
-                // Vulkan hangs or loses the device on Adreno; CPU until a working GPU backend is in.
-                useGpu = false,
+                preferGpu = true,
             )
         }
     }

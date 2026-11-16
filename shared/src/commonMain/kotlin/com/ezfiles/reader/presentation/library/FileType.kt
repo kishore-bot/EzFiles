@@ -2,6 +2,8 @@ package com.ezfiles.reader.presentation.library
 
 import androidx.compose.ui.graphics.Color
 import com.ezfiles.reader.domain.DocumentFormat
+import com.ezfiles.reader.domain.SourceCodeExtensions
+import com.ezfiles.reader.domain.SourceCodeFileNames
 import com.ezfiles.reader.presentation.theme.EzBadgeColors
 
 /** Library filter chips, in display order. */
@@ -81,11 +83,8 @@ enum class FileType(val label: String, colors: Pair<Color, Color>, val filters: 
                 "txt", "text" -> Txt
                 "mp4", "m4v", "mov", "3gp", "3g2", "webm", "mkv" -> Video
                 "mp3", "m4a", "aac", "wav", "ogg", "oga", "opus", "flac", "amr", "mid", "midi" -> Audio
-                "kt", "kts", "java", "js", "mjs", "ts", "tsx", "jsx", "py", "rb", "go", "rs", "c", "h", "cpp", "hpp",
-                "cs", "swift", "php", "sh", "sql", "yaml", "yml", "toml", "ini", "gradle", "css", "scss", "dart",
-                "lua", "scala", "vue", "proto", "graphql", "tex",
-                -> Code
-                else -> null
+                in SourceCodeExtensions -> Code
+                else -> if (name.lowercase() in SourceCodeFileNames) Code else null
             }
             return byExtension ?: when (format) {
                 DocumentFormat.Pdf -> Pdf

@@ -288,6 +288,22 @@ class LibraryTest {
     }
 
     @Test
+    fun walk_finds_source_code_the_reader_can_show() = runTest {
+        val trees = FakeTrees()
+        trees.contents["root"] = listOf(
+            file("main.cpp"), file("App.java"), file("lib.rs"), file("Makefile"), file("script.PY"),
+            file("pdf"), file("README"), file("archive.7z"),
+        )
+
+        val walk = walkDocumentTree(trees, "tree/a", "root")
+
+        assertEquals(listOf("main.cpp", "App.java", "lib.rs", "Makefile", "script.PY"), walk.refs.map { it.displayName })
+        assertEquals(FileType.Code, FileType.of("main.cpp", null))
+        assertEquals(FileType.Code, FileType.of("Makefile", null))
+        assertEquals(FileType.Xml, FileType.of("icon.svg", null))
+    }
+
+    @Test
     fun walk_is_bounded_by_depth_and_survives_cycles() = runTest {
         val trees = FakeTrees()
         trees.contents["root"] = listOf(directory("one"), file("top.pdf"))

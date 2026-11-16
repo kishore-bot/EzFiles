@@ -21,6 +21,9 @@ static bool model_on_gpu = false;
 static std::string model_path_str;
 // Set once the GPU fails; every later call runs on this CPU copy instead.
 static llama_model * cpu_model = nullptr;
+// Engine settings from the last loadModel call; contexts are created with them.
+static int engine_threads = 4;
+static int engine_ubatch = 512;
 
 /**
  * One live context per model. Fily's model is a hybrid with recurrent layers, whose memory can be
@@ -88,8 +91,9 @@ static Engine * engine_for(llama_model * mdl, bool cpu_only) {
     auto params = llama_context_default_params();
     params.n_ctx = N_CTX;
     params.n_batch = N_CTX;
-    params.n_threads = 4;
-    params.n_threads_batch = 4;
+    params.n_threads = engine_threads;
+    params.n_threads_batch = engine_threads;
+    params.n_ubatch = engine_ubatch;
     params.no_perf = false;
     // Otherwise large batches are still sent to the GPU even when no layers live there.
     params.op_offload = !cpu_only;
@@ -258,13 +262,28 @@ static std::string generate(Engine & e, llama_model * mdl, const std::string & p
     return result;
 }
 
-// Runs one token through the model so the first question doesn't pay for page-in and GPU setup;
-// a GPU that fails here falls back before the user asks anything.
-static void warm_up(Engine & e, llama_model * mdl) {
+/**
+ * Reads the prompt start every request shares and keeps its snapshot, then decodes one more token:
+ * multi-token and single-token kernels are compiled now rather than during the first question,
+ * which also starts with the shared part already read. A GPU that fails here falls back early.
+ */
+static void warm_up(Engine & e, llama_model * mdl, const std::string & stable_prefix) {
     std::lock_guard<std::mutex> guard(e.lock);
-    std::vector<llama_token> bos = { llama_vocab_bos(llama_model_get_vocab(mdl)) };
-    decode(e, bos, 0, 1, true);
+    auto vocab = llama_model_get_vocab(mdl);
+    std::vector<llama_token> tokens = stable_prefix.empty()
+        ? std::vector<llama_token>{ llama_vocab_bos(vocab) } : tokenize(vocab, stable_prefix);
+    if (!decode(e, tokens, 0, tokens.size(), true) || stable_prefix.empty()) {
+        reset(e);
+        return;
+    }
+    e.prefix_state.resize(llama_state_seq_get_size(e.ctx, 0));
+    llama_state_seq_get_data(e.ctx, e.prefix_state.data(), e.prefix_state.size(), 0);
+    e.prefix_tokens = tokens;
+    std::vector<llama_token> next = { tokens.back() };
+    decode(e, next, 0, 1, true);
     reset(e);
+    if (llama_state_seq_set_data(e.ctx, e.prefix_state.data(), e.prefix_state.size(), 0) > 0) e.tokens = tokens;
+    LOGI("Warm-up read %zu prompt tokens", tokens.size());
 }
 
 static bool switch_to_cpu() {
@@ -280,12 +299,17 @@ extern "C" {
 
 JNIEXPORT jlong JNICALL
 Java_com_ezfiles_reader_platform_LlamaBridge_loadModel(
-    JNIEnv *env, jobject /* this */, jstring path, jboolean useGpu) {
+    JNIEnv *env, jobject /* this */, jstring path, jboolean useGpu, jint threads, jint ubatch, jstring stablePrefix) {
 
     const char *model_path = env->GetStringUTFChars(path, nullptr);
     model_path_str = model_path;
     env->ReleaseStringUTFChars(path, model_path);
-    LOGI("Loading model: %s (GPU=%d)", model_path_str.c_str(), useGpu);
+    const char *stable_cstr = env->GetStringUTFChars(stablePrefix, nullptr);
+    std::string stable_str(stable_cstr);
+    env->ReleaseStringUTFChars(stablePrefix, stable_cstr);
+    engine_threads = threads > 0 ? threads : 4;
+    engine_ubatch = ubatch > 0 ? ubatch : 512;
+    LOGI("Loading model: %s (GPU=%d, threads=%d, ubatch=%d)", model_path_str.c_str(), useGpu, engine_threads, engine_ubatch);
 
     load_backends();
     llama_backend_init();
@@ -301,7 +325,7 @@ Java_com_ezfiles_reader_platform_LlamaBridge_loadModel(
         return 0;
     }
     try {
-        warm_up(*e, model);
+        warm_up(*e, model, stable_str);
     } catch (const std::exception & ex) {
         LOGE("Warm-up threw: %s", ex.what());
         if (!useGpu || !switch_to_cpu()) return 0;

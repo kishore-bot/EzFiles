@@ -5,7 +5,7 @@ class LlamaBridge {
         init { System.loadLibrary("ezfiles-llama") }
     }
 
-    external fun loadModel(path: String, useGpu: Boolean): Long
+    external fun loadModel(path: String, useGpu: Boolean, threads: Int, ubatch: Int, stablePrefix: String): Long
     external fun runInference(modelPtr: Long, prompt: String, maxTokens: Int, stablePrefix: String, grammar: String): String
     external fun freeModel(modelPtr: Long)
     external fun systemInfo(): String

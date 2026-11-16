@@ -3,6 +3,7 @@ package com.ezfiles.reader.application.assistant
 import kotlinx.coroutines.CancellationException
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.JsonObjectBuilder
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.intOrNull
@@ -17,11 +18,17 @@ import kotlinx.serialization.json.put
 class ToolExecutor(
     private val actions: AssistantActions,
     private val navigation: AssistantNavigation,
+    private val tidy: AssistantTidyActions? = null,
 ) {
     val supported: Set<String> = setOf(
         "searchLibrary", "searchDocuments", "listRecentDocuments", "getDocumentInfo",
-        "getDocumentExcerpt", "findTextInDocument", "openDocument", "listBookmarks", "openBookmark",
-    )
+        "getDocumentExcerpt", "findTextInDocument", "openDocument", "listBookmarks", "openBookmark", "addBookmark",
+        "prepareShareDocument", "prepareShareDocuments", "preparePrintDocument",
+        "openScanner", "openImageToText", "openTextEditor", "createTextDocument", "openTextToPdf", "createPdfFromText",
+        "openImagesToPdf", "createPdfFromImages", "openPdfTools", "mergePdfDocuments", "extractPdfPages",
+        "prepareOrganizePdf", "prepareResizePdf", "preparePdfToImages", "preparePdfToText", "preparePdfToZip",
+        "openPasswordTool", "openTidyUp", "openSimilarDocuments", "startTidyScan",
+    ) + if (tidy != null) setOf("getTidyReport") else emptySet()
 
     suspend fun execute(name: String, args: JsonObject?): String {
         val arguments = args ?: JsonObject(emptyMap())
@@ -36,6 +43,29 @@ class ToolExecutor(
                 "openDocument" -> openDocument(arguments.required("documentId"))
                 "listBookmarks" -> bookmarks(arguments.string("documentId").orEmpty())
                 "openBookmark" -> openBookmark(arguments.required("bookmarkId"))
+                "addBookmark" -> addBookmark(arguments.required("documentId"), arguments.int("pageNumber") ?: throw MissingArgument())
+                "prepareShareDocument" -> documentHandoff(arguments.required("documentId"), AssistantAction.Share, "chooser_opened")
+                "prepareShareDocuments" -> shareDocuments(arguments.ids("documentIds"))
+                "preparePrintDocument" -> documentHandoff(arguments.required("documentId"), AssistantAction.Print, "print_preview_opened")
+                "openScanner" -> tool("ScanToPdf")
+                "openImageToText" -> tool("ImageToText")
+                "openTextEditor" -> tool("NewText")
+                "openTextToPdf" -> tool("TextToPdf")
+                "openImagesToPdf", "createPdfFromImages" -> tool("ImagesToPdf")
+                "openTidyUp", "openSimilarDocuments" -> tool("TidyUp")
+                "startTidyScan" -> handoff("scan_started") { AssistantDestination(null, AssistantAction.Tool, it, tool = "TidyUp", startScan = true) }
+                "createTextDocument" -> draft("NewText", arguments.required("text"), arguments.string("title").orEmpty())
+                "createPdfFromText" -> draft("TextToPdf", arguments.required("text"), arguments.string("title").orEmpty())
+                "openPdfTools" -> pdfTool(null, arguments.string("documentId"))
+                "mergePdfDocuments" -> mergePdfs(arguments.ids("documentIds"))
+                "extractPdfPages" -> pdfTool("Split", arguments.string("documentId"))
+                "prepareOrganizePdf" -> pdfTool("Organize", arguments.string("documentId"))
+                "prepareResizePdf" -> pdfTool("PageSize", arguments.string("documentId"))
+                "preparePdfToImages" -> pdfTool("ToImages", arguments.string("documentId"))
+                "preparePdfToText" -> pdfTool("ToText", arguments.string("documentId"))
+                "preparePdfToZip" -> pdfTool("ToZip", arguments.string("documentId"))
+                "openPasswordTool" -> pdfTool("AddPassword", arguments.string("documentId"))
+                "getTidyReport" -> tidyReport()
                 else -> failed("unsupported_tool")
             }
         } catch (cancelled: CancellationException) {
@@ -95,14 +125,70 @@ class ToolExecutor(
         }.toString()
     }
 
-    private suspend fun openDocument(id: String): String {
+    /**
+     * Asks the foreground to show a screen. Like the platform assistants, this only opens a review:
+     * sharing, printing, saving and every PDF change still need the user's own confirmation.
+     */
+    private suspend fun handoff(status: String, extra: JsonObjectBuilder.() -> Unit = {}, build: suspend (Long) -> AssistantDestination): String {
         val authorization = actions.access.captureAuthorization()
-        val ref = actions.resolveDocument(id)
+        val destination = build(authorization)
         actions.access.recheckAuthorization(authorization)
-        navigation.request(AssistantDestination(ref, AssistantAction.Open, authorization))
+        navigation.request(destination)
         return buildJsonObject {
-            put("status", "opened")
-            put("documentId", id)
+            put("status", status)
+            extra()
+        }.toString()
+    }
+
+    private suspend fun openDocument(id: String): String =
+        handoff("opened", { put("documentId", id) }) { AssistantDestination(actions.resolveDocument(id), AssistantAction.Open, it) }
+
+    private suspend fun documentHandoff(id: String, action: AssistantAction, status: String): String =
+        handoff(status, { put("documentId", id) }) { AssistantDestination(actions.resolveDocument(id), action, it) }
+
+    private suspend fun shareDocuments(ids: List<String>): String = handoff("chooser_opened") {
+        require(ids.isNotEmpty()) { "Choose at least one document." }
+        val refs = actions.resolveDocuments(ids)
+        AssistantDestination(refs.first(), AssistantAction.Share, it, documents = refs)
+    }
+
+    private suspend fun addBookmark(id: String, pageNumber: Int): String = handoff("review_pending", { put("documentId", id) }) {
+        val ref = actions.resolveDocument(id)
+        require(ref.displayName.endsWith(".pdf", ignoreCase = true) && pageNumber in 1..100_000) { "Choose a PDF and an existing page." }
+        AssistantDestination(ref, AssistantAction.Bookmark, it, pageNumber = pageNumber)
+    }
+
+    private suspend fun tool(name: String): String =
+        handoff("opened") { AssistantDestination(null, AssistantAction.Tool, it, tool = name) }
+
+    private suspend fun draft(toolName: String, text: String, title: String): String = handoff("draft_ready") {
+        val draft = AssistantDraft(text, title)
+        AssistantDestination(null, AssistantAction.Tool, it, tool = toolName, draftText = draft.text, draftTitle = draft.title)
+    }
+
+    /** [operation] null opens the PDF tools list. */
+    private suspend fun pdfTool(operation: String?, documentId: String?): String = handoff(if (operation == null) "opened" else "review_pending") {
+        val ref = documentId?.takeIf(String::isNotBlank)?.let { id -> actions.resolveDocument(id) }
+        require(ref == null || ref.displayName.endsWith(".pdf", ignoreCase = true)) { "Choose a PDF file." }
+        AssistantDestination(ref, AssistantAction.Tool, it, tool = "PdfTools", pdfTool = operation)
+    }
+
+    private suspend fun mergePdfs(ids: List<String>): String = handoff("review_pending") {
+        val refs = if (ids.isEmpty()) emptyList() else actions.resolveDocuments(ids)
+        require(refs.all { ref -> ref.displayName.endsWith(".pdf", ignoreCase = true) }) { "Choose PDF files." }
+        AssistantDestination(refs.firstOrNull(), AssistantAction.Tool, it, tool = "PdfTools", pdfTool = "Merge", documents = refs)
+    }
+
+    private suspend fun tidyReport(): String {
+        val report = requireNotNull(tidy).getReport()
+        return buildJsonObject {
+            put("available", report.available)
+            put("partial", report.partial)
+            put("duplicateGroups", report.duplicateGroups)
+            put("similarDocumentGroups", report.similarDocumentGroups)
+            put("similarPhotoGroups", report.similarPhotoGroups)
+            put("reclaimableBytes", report.reclaimableBytes)
+            report.scannedAt?.let { put("scannedAt", isoDate(it)) }
         }.toString()
     }
 
@@ -121,15 +207,9 @@ class ToolExecutor(
         }.toString()
     }
 
-    private suspend fun openBookmark(bookmarkId: String): String {
-        val authorization = actions.access.captureAuthorization()
+    private suspend fun openBookmark(bookmarkId: String): String = handoff("opened", { put("bookmarkId", bookmarkId) }) {
         val target = actions.resolveBookmark(bookmarkId)
-        actions.access.recheckAuthorization(authorization)
-        navigation.request(AssistantDestination(target.ref, AssistantAction.Open, authorization, bookmarkLocation = target.location))
-        return buildJsonObject {
-            put("status", "opened")
-            put("bookmarkId", bookmarkId)
-        }.toString()
+        AssistantDestination(target.ref, AssistantAction.Open, it, bookmarkLocation = target.location)
     }
 
     private fun libraryQuery(args: JsonObject): AssistantLibraryQuery = AssistantLibraryQuery(
@@ -155,6 +235,9 @@ class ToolExecutor(
     private fun JsonObject.int(key: String): Int? = (this[key] as? JsonPrimitive)?.intOrNull
 
     private fun JsonObject.required(key: String): String = string(key)?.takeIf(String::isNotBlank) ?: throw MissingArgument()
+
+    private fun JsonObject.ids(key: String): List<String> =
+        (this[key] as? JsonArray)?.mapNotNull { (it as? JsonPrimitive)?.takeIf { p -> p.isString }?.content }.orEmpty()
 
     private fun failed(reason: String): String = buildJsonObject {
         put("status", "failed")

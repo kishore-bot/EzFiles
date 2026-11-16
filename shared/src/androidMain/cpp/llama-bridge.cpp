@@ -1,6 +1,7 @@
 #include <jni.h>
 #include <android/log.h>
 #include <algorithm>
+#include <cmath>
 #include <exception>
 #include <mutex>
 #include <string>
@@ -167,7 +168,30 @@ static bool prepare(Engine & e, const std::vector<llama_token> & prompt, const s
     return decode(e, prompt, e.tokens.size(), prompt.size(), true);
 }
 
-static std::string generate(Engine & e, llama_model * mdl, const std::string & prompt, const std::string & stable_prefix, int max) {
+/**
+ * The model's top token if the grammar allows it, else the best token the grammar allows. Checking
+ * the top token alone first avoids scoring all 65k candidates against the grammar on every step.
+ */
+static llama_token constrained_best(llama_sampler * grammar, const float * logits, int n_vocab, llama_token best,
+                                    std::vector<llama_token_data> & candidates) {
+    llama_token_data one = { best, logits[best], 0.0f };
+    llama_token_data_array single = { &one, 1, -1, false };
+    llama_sampler_apply(grammar, &single);
+    if (one.logit != -INFINITY) return best;
+    candidates.resize(n_vocab);
+    for (int v = 0; v < n_vocab; v++) candidates[v] = { v, logits[v], 0.0f };
+    llama_token_data_array all = { candidates.data(), static_cast<size_t>(n_vocab), -1, false };
+    llama_sampler_apply(grammar, &all);
+    llama_token allowed = -1;
+    for (size_t i = 0; i < all.size; i++) {
+        if (all.data[i].logit == -INFINITY) continue;
+        if (allowed < 0 || all.data[i].logit > logits[allowed]) allowed = all.data[i].id;
+    }
+    return allowed;
+}
+
+static std::string generate(Engine & e, llama_model * mdl, const std::string & prompt, const std::string & stable_prefix, int max,
+                            const std::string & grammar_text) {
     std::lock_guard<std::mutex> guard(e.lock);
     auto vocab = llama_model_get_vocab(mdl);
     auto tokens = tokenize(vocab, prompt);
@@ -186,10 +210,18 @@ static std::string generate(Engine & e, llama_model * mdl, const std::string & p
     std::string result;
     llama_token eos = llama_vocab_eos(vocab);
     int n_vocab = llama_vocab_n_tokens(vocab);
+    llama_sampler * grammar = grammar_text.empty() ? nullptr : llama_sampler_init_grammar(vocab, grammar_text.c_str(), "root");
+    if (!grammar_text.empty() && grammar == nullptr) LOGE("Grammar did not parse; answering unconstrained");
+    std::vector<llama_token_data> candidates;
     for (int i = 0; i < max; i++) {
         const float * logits = llama_get_logits_ith(e.ctx, -1);
         llama_token best = 0;
         for (int v = 1; v < n_vocab; v++) if (logits[v] > logits[best]) best = v;
+        if (grammar != nullptr) {
+            best = constrained_best(grammar, logits, n_vocab, best, candidates);
+            if (best < 0) break;
+            llama_sampler_accept(grammar, best);
+        }
         if (best == eos || llama_vocab_is_eog(vocab, best)) break;
 
         char buf[128];
@@ -217,6 +249,7 @@ static std::string generate(Engine & e, llama_model * mdl, const std::string & p
         }
     }
 
+    if (grammar != nullptr) llama_sampler_free(grammar);
     auto perf = llama_perf_context(e.ctx);
     LOGI("Timing: %zu prompt tok (%zu already held, %d read in %.0f ms), generated %d tok in %.0f ms (%.1f tok/s)",
          tokens.size(), held, perf.n_p_eval, perf.t_p_eval_ms,
@@ -279,7 +312,7 @@ Java_com_ezfiles_reader_platform_LlamaBridge_loadModel(
 
 JNIEXPORT jstring JNICALL
 Java_com_ezfiles_reader_platform_LlamaBridge_runInference(
-    JNIEnv *env, jobject /* this */, jlong modelPtr, jstring prompt, jint maxTokens, jstring stablePrefix) {
+    JNIEnv *env, jobject /* this */, jlong modelPtr, jstring prompt, jint maxTokens, jstring stablePrefix, jstring grammar) {
 
     auto *mdl = cpu_model != nullptr ? cpu_model : reinterpret_cast<llama_model *>(modelPtr);
     if (mdl == nullptr) {
@@ -292,12 +325,15 @@ Java_com_ezfiles_reader_platform_LlamaBridge_runInference(
     const char *stable_cstr = env->GetStringUTFChars(stablePrefix, nullptr);
     std::string stable_str(stable_cstr);
     env->ReleaseStringUTFChars(stablePrefix, stable_cstr);
+    const char *grammar_cstr = env->GetStringUTFChars(grammar, nullptr);
+    std::string grammar_str(grammar_cstr);
+    env->ReleaseStringUTFChars(grammar, grammar_cstr);
     int max = maxTokens > 0 ? maxTokens : 128;
 
     Engine * e = engine_for(mdl, cpu_model != nullptr || !model_on_gpu);
     if (e == nullptr) return env->NewStringUTF("{\"kind\":\"reply\",\"text\":\"Context creation failed.\",\"citations\":[]}");
     try {
-        return env->NewStringUTF(generate(*e, mdl, prompt_str, stable_str, max).c_str());
+        return env->NewStringUTF(generate(*e, mdl, prompt_str, stable_str, max, grammar_str).c_str());
     } catch (const std::exception & ex) {
         LOGE("Inference threw: %s", ex.what());
     } catch (...) {
@@ -308,7 +344,7 @@ Java_com_ezfiles_reader_platform_LlamaBridge_runInference(
         return env->NewStringUTF("{\"kind\":\"reply\",\"text\":\"Something went wrong. Try again.\",\"citations\":[]}");
     }
     try {
-        return env->NewStringUTF(generate(*engine_for(cpu_model, true), cpu_model, prompt_str, stable_str, max).c_str());
+        return env->NewStringUTF(generate(*engine_for(cpu_model, true), cpu_model, prompt_str, stable_str, max, grammar_str).c_str());
     } catch (const std::exception & ex) {
         LOGE("CPU inference threw: %s", ex.what());
         return env->NewStringUTF("{\"kind\":\"reply\",\"text\":\"Something went wrong. Try again.\",\"citations\":[]}");

@@ -46,12 +46,12 @@ class ModelManager internal constructor(
     }
 
     /** Continues a fully rendered prompt; see [FilyPrompt.render]. */
-    suspend fun complete(prompt: String, maxTokens: Int = 128): String {
+    suspend fun complete(prompt: String, grammar: String = "", maxTokens: Int = 128): String {
         if (_state.value != ModelState.Ready) return NOT_READY
-        if (!onGpu) return withContext(lane) { inference.infer(prompt, maxTokens, FilyPrompt.STABLE_PREFIX) }
+        if (!onGpu) return withContext(lane) { inference.infer(prompt, maxTokens, FilyPrompt.STABLE_PREFIX, grammar) }
         val current = inference
         // Not a child of this call: a hung native call cannot be cancelled, so it is left behind.
-        val call = CoroutineScope(lane).async { current.infer(prompt, maxTokens, FilyPrompt.STABLE_PREFIX) }
+        val call = CoroutineScope(lane).async { current.infer(prompt, maxTokens, FilyPrompt.STABLE_PREFIX, grammar) }
         val answer = withTimeoutOrNull(GPU_TIMEOUT_MS) { call.await() }
         if (answer != null && !current.gpuFailed()) {
             if (!gpuProven) storage.put(GPU_KEY, "$buildStamp:$PROVEN")
@@ -68,7 +68,7 @@ class ModelManager internal constructor(
             _state.value = ModelState.Error
             return NOT_READY
         }
-        return withContext(lane) { inference.infer(prompt, maxTokens, FilyPrompt.STABLE_PREFIX) }
+        return withContext(lane) { inference.infer(prompt, maxTokens, FilyPrompt.STABLE_PREFIX, grammar) }
     }
 
     fun systemInfo(): String = inference.systemInfo()

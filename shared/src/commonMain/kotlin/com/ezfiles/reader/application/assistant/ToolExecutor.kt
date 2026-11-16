@@ -111,9 +111,13 @@ class ToolExecutor(
         }.toString()
     }
 
+    /** The user's words for the current request; excerpts pick the passages that answer them. */
+    var question: String = ""
+
     private suspend fun excerpt(id: String, maxChars: Int?): String {
         // Short enough to leave room for the reply in the model's context window.
-        val excerpt = actions.getDocumentExcerpt(id, (maxChars ?: MAX_EXCERPT_CHARS).coerceIn(1, MAX_EXCERPT_CHARS))
+        val budget = (maxChars ?: MAX_EXCERPT_CHARS).coerceIn(1, MAX_EXCERPT_CHARS)
+        val excerpt = if (question.isNotBlank()) actions.getRelevantPassages(id, question, budget) else actions.getDocumentExcerpt(id, budget)
         return buildJsonObject {
             put("documentId", ids.alias(excerpt.document.id))
             put("text", excerpt.text)

@@ -141,7 +141,7 @@ private fun createAndroidAppDependencies(context: Context, assistantAccess: Assi
     )
     val readerControl = ReaderControl()
     val filySession = FilySession(
-        { prompt -> modelManager.complete(prompt) },
+        { prompt, grammar -> modelManager.complete(prompt, grammar) },
         ToolExecutor(assistantActions, assistantNavigation, assistantTidy, readerControl),
         assistantAccess,
         today = { java.time.LocalDate.now().toString() },

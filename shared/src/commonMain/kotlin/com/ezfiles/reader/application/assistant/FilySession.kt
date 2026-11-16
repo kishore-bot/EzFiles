@@ -10,8 +10,8 @@ import kotlinx.serialization.json.put
  * thread-safe; callers ask one question at a time.
  */
 class FilySession(
-    /** Continues a rendered prompt; [ModelManager.complete] in the app. */
-    private val complete: suspend (String) -> String,
+    /** Continues a rendered prompt, constrained by a GBNF grammar; [ModelManager.complete] in the app. */
+    private val complete: suspend (prompt: String, grammar: String) -> String,
     private val tools: ToolExecutor,
     private val access: AssistantAccess,
     private val today: () -> String,
@@ -42,11 +42,13 @@ class FilySession(
         QuickCommands.parse(request, screen.readerCapabilities, screen.pageCount)?.let { return quick(request, it) }
         val toolNames = ToolSelector.select(request, screen, tools.supported)
         val system = FilyPrompt.system(toolNames)
+        val grammar = FilyGrammar.forTools(toolNames)
+        tools.question = request
         val state = FilyTurn(FilyRole.User, FilyPrompt.appState(access.enabled.value, access.contentAccess.value, today(), screen))
         val exchange = mutableListOf(FilyTurn(FilyRole.User, request))
         repeat(MAX_TOOL_STEPS + 1) { step ->
             val earlier = history.takeLast(MAX_HISTORY_EXCHANGES).flatten()
-            val raw = complete(FilyPrompt.render(system, listOf(state) + earlier + exchange)).trim()
+            val raw = complete(FilyPrompt.render(system, listOf(state) + earlier + exchange), grammar).trim()
             val response = parseModelResponse(raw)
             exchange += FilyTurn(FilyRole.Assistant, raw)
             val toolName = response.toolName

@@ -46,3 +46,6 @@ ezjks
 /.vscode
 # Downloaded build dependencies (sherpa-onnx), see shared/build.gradle.kts
 /.cache/
+
+# Local build logs
+/*.log

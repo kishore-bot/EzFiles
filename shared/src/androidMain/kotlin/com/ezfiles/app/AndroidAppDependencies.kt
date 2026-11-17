@@ -187,6 +187,7 @@ private fun createAndroidAppDependencies(context: Context, assistantAccess: Assi
         filySession = filySession,
         readerControl = readerControl,
         speechSettings = com.ezfiles.reader.platform.SpeechSettings(storage),
+        playbackMemory = com.ezfiles.reader.data.PlaybackMemory(storage, ::currentTimeMillis),
     )
 }
 

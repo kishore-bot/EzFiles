@@ -174,6 +174,8 @@ class AppDependencies internal constructor(
     /** The viewer on screen, as the assistant may drive it. */
     internal val readerControl: com.ezfiles.reader.application.assistant.ReaderControl? = null,
     internal val speechSettings: com.ezfiles.reader.platform.SpeechSettings? = null,
+    /** Where each video was left, to continue there. */
+    internal val playbackMemory: com.ezfiles.reader.data.PlaybackMemory = com.ezfiles.reader.data.NoPlaybackMemory,
 )
 
 @OptIn(ExperimentalTime::class)
@@ -285,6 +287,7 @@ fun App(
             LocalGlancer provides dependencies.glancer,
             LocalDocumentEditor provides dependencies.documentEditor,
             LocalReaderControl provides dependencies.readerControl,
+            com.ezfiles.reader.presentation.viewers.LocalPlaybackMemory provides dependencies.playbackMemory,
         ) {
             PickerHost(state, pickedAction)
             // Fily stays open across screens, so "open my resume" then "next page" is one conversation.

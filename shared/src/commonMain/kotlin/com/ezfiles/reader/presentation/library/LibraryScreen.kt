@@ -158,6 +158,7 @@ fun LibraryScreen(
     searchInput: String = state.query,
 ) {
     var bookmarksShown by rememberSaveable { mutableStateOf(false) }
+    val playback = com.ezfiles.reader.presentation.viewers.LocalPlaybackMemory.current
     val landscape = isWideLandscape()
     val delivery = rememberDocumentDeliveryActions()
     var shareSelection by remember { mutableStateOf<List<DocumentRef>>(emptyList()) }
@@ -295,7 +296,12 @@ fun LibraryScreen(
                     FileCard(
                         type = item.type,
                         name = item.ref.displayName,
-                        meta = if (shareSelection.any { it.uri == item.ref.uri }) "Selected · ${item.meta}" else item.meta,
+                        meta = run {
+                            // A part-watched video says how much is left ("1h 12m left").
+                            val left = playback.remainingMs(item.ref)?.let { "${durationWords(it)} left" }
+                            val base = listOfNotNull(left, item.meta.takeIf(String::isNotEmpty)).joinToString("  •  ")
+                            if (shareSelection.any { it.uri == item.ref.uri }) "Selected · $base" else base
+                        },
                         onClick = { onOpen(item.ref) },
                         onMore = { menuOpen = true },
                         modifier = Modifier.padding(horizontal = EzSpacing.Gutter),
@@ -639,4 +645,14 @@ private fun FileFilter.iconTint() = when (this) {
 internal fun String.withoutExtension(): String {
     val dot = lastIndexOf('.')
     return if (dot <= 0 || length - dot > 6) this else substring(0, dot)
+}
+
+/** "1h 12m", "25m", "40s": how a person says time left. */
+internal fun durationWords(ms: Long): String {
+    val minutes = ms / 60_000
+    return when {
+        minutes >= 60 -> "${minutes / 60}h ${minutes % 60}m"
+        minutes >= 1 -> "${minutes}m"
+        else -> "${(ms / 1000).coerceAtLeast(1)}s"
+    }
 }

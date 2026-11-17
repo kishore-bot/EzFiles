@@ -1,5 +1,12 @@
 package com.ezfiles.reader.presentation.viewers
 
+import androidx.compose.runtime.MutableState
+import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.staticCompositionLocalOf
+import androidx.compose.material3.TextButton
+import com.ezfiles.reader.data.NoPlaybackMemory
+import com.ezfiles.reader.data.PlaybackMemory
+import com.ezfiles.reader.data.ResumePoint
 import androidx.compose.foundation.gestures.awaitEachGesture
 import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.gestures.calculatePan
@@ -133,6 +140,7 @@ private enum class VideoScale(val label: String, val aspect: Float? = null) {
 @Composable
 fun MediaPlayerView(source: MediaSource, kind: MediaKind, title: String, modifier: Modifier = Modifier, ref: DocumentRef? = null, onClose: (() -> Unit)? = null) {
     val player = rememberMediaPlayer(source)
+    val resumedAt = rememberPlaybackResume(player, ref, audio = kind != MediaKind.Video)
     var controls by remember { mutableStateOf(true) }
     val video = kind == MediaKind.Video
     val device = rememberMediaDeviceControls()
@@ -323,6 +331,25 @@ fun MediaPlayerView(source: MediaSource, kind: MediaKind, title: String, modifie
             AudioArtwork(title, Modifier.align(Alignment.Center))
         }
         if (video) SubtitleOverlay(player, controls, Modifier.align(Alignment.BottomCenter))
+        // "Resumed at 1:23:45 · Start over", for a few seconds after opening.
+        resumedAt.value?.let { at ->
+            LaunchedEffect(at) {
+                delay(RESUME_NOTE_MS)
+                resumedAt.value = null
+            }
+            Row(
+                Modifier.align(Alignment.TopCenter).padding(top = 72.dp).clip(EzShapes.Card)
+                    .background(Color.Black.copy(alpha = 0.72f)).padding(start = 16.dp, end = 4.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Text("Resumed at ${clock(at)}", color = Color.White, fontSize = 15.sp)
+                TextButton(onClick = {
+                    player.seekTo(0)
+                    resumedAt.value = null
+                    haptics.select()
+                }) { Text("Start over", color = Color.White, fontWeight = FontWeight.Bold) }
+            }
+        }
         gestureMessage?.let { message ->
             Text(message, color = Color.White, fontSize = 18.sp,
                 modifier = Modifier.align(Alignment.Center).clip(EzShapes.Card).background(Color.Black.copy(alpha = 0.72f)).padding(16.dp))
@@ -592,6 +619,76 @@ private fun AudioArtwork(title: String, modifier: Modifier = Modifier) {
 private const val SKIP_MS = 10_000L
 
 /** 65,000 ms → "1:05"; an hour or more → "1:01:05". */
+private const val RESUME_NOTE_MS = 6_000L
+private const val SAVE_EVERY_MS = 5_000L
+
+/** The app's playback memory; nothing is remembered where none is provided. */
+val LocalPlaybackMemory = staticCompositionLocalOf<PlaybackMemory> { NoPlaybackMemory }
+
+/**
+ * Continues [ref] where it was left, with the soundtrack and subtitles chosen last time, and keeps
+ * the place saved while it plays (every few seconds, on pause and on leaving). The returned state
+ * holds the resumed position while the "Start over" note shows.
+ */
+@Composable
+private fun rememberPlaybackResume(player: MediaPlayerState, ref: DocumentRef?, audio: Boolean): MutableState<Long?> {
+    val memory = LocalPlaybackMemory.current
+    val resumedAt = remember(ref) { mutableStateOf<Long?>(null) }
+    if (ref == null) return resumedAt
+    var point by remember(ref) { mutableStateOf<ResumePoint?>(null) }
+    var looked by remember(ref) { mutableStateOf(false) }
+    var tracksRestored by remember(ref) { mutableStateOf(false) }
+    LaunchedEffect(ref, player.status, player.durationMs) {
+        if (looked || player.status != MediaStatus.Ready || player.durationMs <= 0) return@LaunchedEffect
+        looked = true
+        val found = memory.resumePoint(ref, player.durationMs, audio) ?: return@LaunchedEffect
+        point = found
+        if (found.positionMs > 0) {
+            player.seekTo(found.positionMs)
+            resumedAt.value = found.positionMs
+        }
+    }
+    // Tracks arrive after the player is ready; restore the remembered choices once.
+    LaunchedEffect(point, player.audioTracks, player.subtitleTracks) {
+        val wanted = point ?: return@LaunchedEffect
+        if (tracksRestored || (player.audioTracks.isEmpty() && player.subtitleTracks.isEmpty())) return@LaunchedEffect
+        tracksRestored = true
+        wanted.audioLanguage?.let { language ->
+            player.audioTracks.firstOrNull { it.language == language && it.supported }
+                ?.takeIf { it.id != player.selectedAudioTrack }?.let { player.selectAudioTrack(it.id) }
+        }
+        when (val subtitles = wanted.subtitles) {
+            null -> {}
+            "off" -> if (player.selectedSubtitleTrack != null && player.selectedSubtitleTrack != "external") player.selectSubtitleTrack(null)
+            else -> player.subtitleTracks.firstOrNull { it.language == subtitles && it.supported }?.let { player.selectSubtitleTrack(it.id) }
+        }
+    }
+    fun save() {
+        if (!looked || player.durationMs <= 0) return
+        // Only a real choice is remembered: one soundtrack, or never-touched subtitles, say nothing.
+        val audioLanguage = player.audioTracks.takeIf { it.size > 1 }
+            ?.firstOrNull { it.id == player.selectedAudioTrack }?.language?.takeIf(String::isNotBlank)
+        val subtitles = when (val selected = player.selectedSubtitleTrack) {
+            null -> if (player.subtitleTracks.isNotEmpty() && point?.subtitles != null) "off" else null
+            "external" -> null
+            else -> player.subtitleTracks.firstOrNull { it.id == selected }?.language?.takeIf(String::isNotBlank)
+        }
+        memory.save(ref, player.positionMs, player.durationMs, audio, audioLanguage, subtitles)
+    }
+    LaunchedEffect(ref, player.playing) {
+        if (!player.playing) {
+            save()
+            return@LaunchedEffect
+        }
+        while (true) {
+            delay(SAVE_EVERY_MS)
+            save()
+        }
+    }
+    DisposableEffect(ref) { onDispose { save() } }
+    return resumedAt
+}
+
 internal fun clock(ms: Long): String {
     val total = (ms.coerceAtLeast(0) / 1000).toInt()
     val hours = total / 3600

@@ -20,6 +20,7 @@ import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.SpanStyle
@@ -188,7 +189,9 @@ fun CodeBookViewer(state: ReaderUiState.Ready, onLoadMore: () -> Unit, onRetry: 
                 modifier = Modifier
                     .align(Alignment.TopEnd)
                     .padding(top = 10.dp, end = 12.dp)
-                    .background(theme.background.copy(alpha = 0.92f), RoundedCornerShape(50))
+                    .clip(RoundedCornerShape(50))
+                    .background(theme.background)
+                    .background(theme.foldIndicator.copy(alpha = 0.12f))
                     .clickable { folds.forEach { toggled[it.start] = anyOpen } }
                     .padding(horizontal = 14.dp, vertical = 8.dp),
             )

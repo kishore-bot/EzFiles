@@ -55,7 +55,8 @@ private val IntelliJLight = CodeTheme(
     string = SpanStyle(color = Color(0xFF067D17)),
     comment = SpanStyle(color = Color(0xFF8C8C8C), fontStyle = FontStyle.Italic),
     number = SpanStyle(color = Color(0xFF1750EB)),
-    annotation = SpanStyle(color = Color(0xFFBBB529)),
+    // Darker than IntelliJ's editor yellow, for contrast on the white page.
+    annotation = SpanStyle(color = Color(0xFF9E880D)),
     typeName = SpanStyle(color = Color(0xFF000000), fontWeight = FontWeight.Bold),
     functionCall = SpanStyle(color = Color(0xFF7A7A43)),
     tag = SpanStyle(color = Color(0xFF0033B3)),

@@ -553,7 +553,10 @@ fun App(
                     }
                     CompositionLocalProvider(LocalSlideImages provides images, LocalDocumentResource provides reader::loadResource,
                         LocalPhotoGallerySession provides photoGallery) {
-                        val darkReading by reader.darkReading.collectAsStateWithLifecycle()
+                        val darkReadingOverride by reader.darkReadingOverride.collectAsStateWithLifecycle()
+                        reader.themeDark = darkTheme
+                        // Documents follow the app theme unless the reader menu says otherwise.
+                        val darkReading = darkReadingOverride ?: darkTheme
                         ReaderScreen(shown, { action ->
                             if (action == ReaderAction.CloseDocument) navigationHaptics.navigate()
                             pickedAction(action)

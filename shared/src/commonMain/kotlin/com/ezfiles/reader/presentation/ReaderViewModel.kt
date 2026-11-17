@@ -104,7 +104,7 @@ class ReaderViewModel(
             is ReaderAction.ExtractEntry -> extractEntry(action.path)
             is ReaderAction.ShowFindReplace -> _showFindReplace.value = action.show
             is ReaderAction.ReplaceAll -> {} // wired to UI; engine call runs from App.kt
-            ReaderAction.ToggleDarkReading -> _darkReading.value = !_darkReading.value
+            ReaderAction.ToggleDarkReading -> _darkReading.value = !(_darkReading.value ?: themeDark)
         }
     }
 
@@ -272,8 +272,15 @@ class ReaderViewModel(
     private val _showFindReplace = MutableStateFlow(false)
     val showFindReplace: StateFlow<Boolean> = _showFindReplace.asStateFlow()
 
-    private val _darkReading = MutableStateFlow(false)
-    val darkReading: StateFlow<Boolean> = _darkReading.asStateFlow()
+    /**
+     * Null: documents follow the app theme (dark pages in dark mode). The reader menu's "Dark reading"
+     * / "Light reading" sets it for the rest of the session.
+     */
+    private val _darkReading = MutableStateFlow<Boolean?>(null)
+    val darkReadingOverride: StateFlow<Boolean?> = _darkReading.asStateFlow()
+
+    /** The app theme, kept current by the UI, so the reader's toggle flips what is on screen. */
+    var themeDark: Boolean = false
 
     data class ExtractedEntry(val name: String, val bytes: ByteArray)
 

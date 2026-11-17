@@ -12,6 +12,9 @@ import android.graphics.ImageDecoder
 import android.os.Build
 import androidx.activity.compose.BackHandler
 import androidx.annotation.RequiresApi
+import androidx.compose.runtime.setValue
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.remember
@@ -184,10 +187,9 @@ actual fun rememberEnterPip(): (Float) -> Unit {
     return remember(activity) {
         { aspect: Float ->
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O && activity != null) {
-                val rational = android.util.Rational(
-                    (aspect * 1000).toInt().coerceIn(1, 2390),
-                    1000.coerceIn(1, 2390),
-                )
+                // Android accepts only 1:2.39 to 2.39:1; a tall phone video would otherwise not open in PiP.
+                val shape = aspect.takeIf { it > 0f }?.coerceIn(0.42f, 2.39f) ?: (16f / 9f)
+                val rational = android.util.Rational((shape * 1000).toInt(), 1000)
                 val params = android.app.PictureInPictureParams.Builder()
                     .setAspectRatio(rational)
                     .build()
@@ -195,6 +197,18 @@ actual fun rememberEnterPip(): (Float) -> Unit {
             }
         }
     }
+}
+
+@Composable
+actual fun rememberInPictureInPicture(): Boolean {
+    val activity = LocalContext.current.findActivity() as? androidx.activity.ComponentActivity ?: return false
+    var inPip by remember(activity) { mutableStateOf(activity.isInPictureInPictureMode) }
+    DisposableEffect(activity) {
+        val listener = androidx.core.util.Consumer<androidx.core.app.PictureInPictureModeChangedInfo> { inPip = it.isInPictureInPictureMode }
+        activity.addOnPictureInPictureModeChangedListener(listener)
+        onDispose { activity.removeOnPictureInPictureModeChangedListener(listener) }
+    }
+    return inPip
 }
 
 private fun Context.findActivity(): Activity? = when (this) {

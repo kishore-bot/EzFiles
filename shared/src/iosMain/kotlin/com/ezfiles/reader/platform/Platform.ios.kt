@@ -34,6 +34,9 @@ actual fun LockOrientation(locked: Boolean) = Unit
 @Composable
 actual fun rememberEnterPip(): (Float) -> Unit = { _ -> }
 
+@androidx.compose.runtime.Composable
+actual fun rememberInPictureInPicture(): Boolean = false
+
 /** Presenting fills the window already; orientation follows the device. */
 @Composable
 actual fun PresentationMode() = Unit

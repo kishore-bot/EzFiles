@@ -1,5 +1,10 @@
 package com.ezfiles.reader.presentation.viewers
 
+import androidx.compose.foundation.gestures.awaitEachGesture
+import androidx.compose.foundation.gestures.awaitFirstDown
+import androidx.compose.foundation.gestures.calculatePan
+import androidx.compose.foundation.gestures.calculateZoom
+import androidx.compose.ui.graphics.graphicsLayer
 import com.ezfiles.reader.domain.spokenNumber
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.fadeIn
@@ -109,10 +114,13 @@ import kotlin.math.roundToInt
 private const val CONTROLS_HIDE_MS = 3000L
 private val MEDIA_VOICE_OPERATIONS = setOf("play", "pause", "seek")
 
-private enum class VideoScale(val label: String) {
+private enum class VideoScale(val label: String, val aspect: Float? = null) {
     Fit("Fit"),
-    Fill("Fill"),
+    Fill("Fill (crop)"),
     Stretch("Stretch"),
+    /** Fixed shapes, for files that report the wrong one. */
+    Wide("16:9", 16f / 9f),
+    Classic("4:3", 4f / 3f),
     ;
     fun next(): VideoScale = entries[(ordinal + 1) % entries.size]
 }
@@ -151,6 +159,9 @@ fun MediaPlayerView(source: MediaSource, kind: MediaKind, title: String, modifie
     var menuOpen by remember { mutableStateOf(false) }
     var detailsOpen by remember { mutableStateOf(false) }
     var videoScale by remember { mutableStateOf(VideoScale.Fit) }
+    // Two-finger pinch zoom (1x-4x) and pan, on top of the resize mode.
+    var zoom by remember { mutableStateOf(1f) }
+    var pan by remember { mutableStateOf(Offset.Zero) }
     val enterPip = rememberEnterPip()
     LockOrientation(orientationLocked)
     val loadSubtitles = rememberSubtitleLoader()
@@ -211,6 +222,26 @@ fun MediaPlayerView(source: MediaSource, kind: MediaKind, title: String, modifie
                     },
                 )
             }
+            .pointerInput(video) {
+                if (!video) return@pointerInput
+                // Only with two fingers: one-finger swipes stay seek, brightness and volume.
+                awaitEachGesture {
+                    awaitFirstDown(requireUnconsumed = false)
+                    do {
+                        val event = awaitPointerEvent()
+                        if (event.changes.count { it.pressed } >= 2) {
+                            val next = (zoom * event.calculateZoom()).coerceIn(1f, 4f)
+                            val limit = Offset(size.width * (next - 1) / 2, size.height * (next - 1) / 2)
+                            val moved = pan + event.calculatePan()
+                            zoom = next
+                            pan = Offset(moved.x.coerceIn(-limit.x, limit.x), moved.y.coerceIn(-limit.y, limit.y))
+                            gestureMessage = "Zoom ${(zoom * 100).roundToInt()}%"
+                            event.changes.forEach { it.consume() }
+                        }
+                    } while (event.changes.any { it.pressed })
+                    if (gestureMessage?.startsWith("Zoom") == true) gestureMessage = null
+                }
+            }
             .pointerInput(player, device, video, haptics) {
                 var origin = Offset.Zero
                 var movement = Offset.Zero
@@ -269,9 +300,9 @@ fun MediaPlayerView(source: MediaSource, kind: MediaKind, title: String, modifie
     ) {
         if (video) {
             BoxWithConstraints(Modifier.fillMaxSize().clipToBounds(), contentAlignment = Alignment.Center) {
-                val aspect = player.videoAspect.takeIf { it > 0f } ?: (16f / 9f)
+                val aspect = videoScale.aspect ?: player.videoAspect.takeIf { it > 0f } ?: (16f / 9f)
                 val surfaceModifier = when (videoScale) {
-                    VideoScale.Fit -> {
+                    VideoScale.Fit, VideoScale.Wide, VideoScale.Classic -> {
                         val wider = maxWidth / maxHeight > aspect
                         Modifier.aspectRatio(aspect, matchHeightConstraintsFirst = wider)
                     }
@@ -281,7 +312,12 @@ fun MediaPlayerView(source: MediaSource, kind: MediaKind, title: String, modifie
                     }
                     VideoScale.Stretch -> Modifier.fillMaxSize()
                 }
-                VideoSurface(player, surfaceModifier)
+                VideoSurface(player, surfaceModifier.graphicsLayer {
+                    scaleX = zoom
+                    scaleY = zoom
+                    translationX = pan.x
+                    translationY = pan.y
+                })
             }
         } else {
             AudioArtwork(title, Modifier.align(Alignment.Center))
@@ -330,7 +366,7 @@ fun MediaPlayerView(source: MediaSource, kind: MediaKind, title: String, modifie
                             EzMenuItem("Playback", onClick = { menuOpen = false; settings = "settings"; touched() }, icon = EzIcons.Music)
                             if (video) EzMenuItem(
                                 "Resize: ${videoScale.label}",
-                                onClick = { videoScale = videoScale.next(); haptics.select(); menuOpen = false },
+                                onClick = { videoScale = videoScale.next(); zoom = 1f; pan = Offset.Zero; haptics.select(); menuOpen = false },
                                 icon = EzIcons.AspectRatio,
                             )
                             if (video) EzMenuItem(

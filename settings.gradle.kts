@@ -22,5 +22,7 @@ dependencyResolutionManagement {
 }
 
 include(":shared")
+// FFmpeg audio decoders for the video player (LGPL libraries built by scripts/build-ffmpeg.sh).
+include(":ffmpeg")
 include(":androidApp")
 include(":baselineprofile")

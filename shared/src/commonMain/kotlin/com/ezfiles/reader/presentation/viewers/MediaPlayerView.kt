@@ -100,6 +100,7 @@ import com.ezfiles.reader.platform.draggedMediaLevel
 import com.ezfiles.reader.platform.draggedMediaPosition
 import com.ezfiles.reader.platform.rememberMediaDeviceControls
 import com.ezfiles.reader.platform.rememberEnterPip
+import com.ezfiles.reader.platform.rememberInPictureInPicture
 import com.ezfiles.reader.platform.rememberSubtitleLoader
 import com.ezfiles.reader.platform.rememberSubtitlePicker
 import com.ezfiles.reader.presentation.components.EzDialog
@@ -141,6 +142,9 @@ private enum class VideoScale(val label: String, val aspect: Float? = null) {
 fun MediaPlayerView(source: MediaSource, kind: MediaKind, title: String, modifier: Modifier = Modifier, ref: DocumentRef? = null, onClose: (() -> Unit)? = null) {
     val player = rememberMediaPlayer(source)
     val resumedAt = rememberPlaybackResume(player, ref, audio = kind != MediaKind.Video)
+    // In Picture-in-Picture only the picture (and subtitles) shows; Android adds its own
+    // back-to-app and close buttons on top.
+    val inPip = rememberInPictureInPicture()
     var controls by remember { mutableStateOf(true) }
     val video = kind == MediaKind.Video
     val device = rememberMediaDeviceControls()
@@ -330,9 +334,9 @@ fun MediaPlayerView(source: MediaSource, kind: MediaKind, title: String, modifie
         } else {
             AudioArtwork(title, Modifier.align(Alignment.Center))
         }
-        if (video) SubtitleOverlay(player, controls, Modifier.align(Alignment.BottomCenter))
+        if (video) SubtitleOverlay(player, controls && !inPip, Modifier.align(Alignment.BottomCenter), small = inPip)
         // "Resumed at 1:23:45 · Start over", for a few seconds after opening.
-        resumedAt.value?.let { at ->
+        resumedAt.value?.takeIf { !inPip }?.let { at ->
             LaunchedEffect(at) {
                 delay(RESUME_NOTE_MS)
                 resumedAt.value = null
@@ -350,7 +354,7 @@ fun MediaPlayerView(source: MediaSource, kind: MediaKind, title: String, modifie
                 }) { Text("Start over", color = Color.White, fontWeight = FontWeight.Bold) }
             }
         }
-        gestureMessage?.let { message ->
+        gestureMessage?.takeIf { !inPip }?.let { message ->
             Text(message, color = Color.White, fontSize = 18.sp,
                 modifier = Modifier.align(Alignment.Center).clip(EzShapes.Card).background(Color.Black.copy(alpha = 0.72f)).padding(16.dp))
         }
@@ -364,7 +368,7 @@ fun MediaPlayerView(source: MediaSource, kind: MediaKind, title: String, modifie
             )
             MediaStatus.Ready -> {}
         }
-        AnimatedVisibility(controls || !video, enter = fadeIn(), exit = fadeOut(), modifier = Modifier.fillMaxSize()) {
+        AnimatedVisibility((controls || !video) && !inPip, enter = fadeIn(), exit = fadeOut(), modifier = Modifier.fillMaxSize()) {
             Box(Modifier.fillMaxSize()) {
                 Row(
                     Modifier
@@ -422,7 +426,15 @@ fun MediaPlayerView(source: MediaSource, kind: MediaKind, title: String, modifie
         PlayerSettings(player, device, section, subtitleLoading, onPickSubtitles = subtitlePicker::launch, onDismiss = { settings = null; touched() })
     }
     val problem = subtitleProblem ?: player.trackProblem ?: device.problem
-    if (problem != null) EzDialog(
+    // Menus and sheets close as the window shrinks; they can't be used in it.
+    LaunchedEffect(inPip) {
+        if (inPip) {
+            settings = null
+            menuOpen = false
+            detailsOpen = false
+        }
+    }
+    if (problem != null && !inPip) EzDialog(
         onDismissRequest = { subtitleProblem = null; player.dismissTrackProblem(); device.dismissProblem() },
         title = { Text("Playback") }, text = { Text(problem) },
         confirmButton = { EzTextButton("OK", { subtitleProblem = null; player.dismissTrackProblem(); device.dismissProblem() }) },
@@ -431,15 +443,15 @@ fun MediaPlayerView(source: MediaSource, kind: MediaKind, title: String, modifie
 }
 
 @Composable
-private fun SubtitleOverlay(player: MediaPlayerState, controls: Boolean, modifier: Modifier) {
+private fun SubtitleOverlay(player: MediaPlayerState, controls: Boolean, modifier: Modifier, small: Boolean = false) {
     val text = if (player.selectedSubtitleTrack == "external") player.externalSubtitles?.textAt(player.positionMs).orEmpty() else player.subtitleText
     if (text.isNotBlank()) Text(
-        text, color = Color.White, fontSize = 20.sp, lineHeight = 27.sp, textAlign = TextAlign.Center,
-        maxLines = 4, overflow = TextOverflow.Ellipsis,
+        text, color = Color.White, fontSize = if (small) 11.sp else 20.sp, lineHeight = if (small) 14.sp else 27.sp,
+        textAlign = TextAlign.Center, maxLines = if (small) 2 else 4, overflow = TextOverflow.Ellipsis,
         modifier = modifier.fillMaxWidth()
             .windowInsetsPadding(WindowInsets.safeDrawing.only(WindowInsetsSides.Horizontal + WindowInsetsSides.Bottom))
             .windowInsetsPadding(WindowInsets.safeContent.only(WindowInsetsSides.Bottom))
-            .padding(horizontal = 24.dp).padding(bottom = if (controls) 164.dp else 28.dp)
+            .padding(horizontal = if (small) 6.dp else 24.dp).padding(bottom = if (controls) 164.dp else if (small) 6.dp else 28.dp)
             .wrapContentSize().clip(EzShapes.Small).background(Color.Black.copy(alpha = 0.78f)).padding(horizontal = 12.dp, vertical = 6.dp),
     )
 }

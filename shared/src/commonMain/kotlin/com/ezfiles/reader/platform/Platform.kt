@@ -128,6 +128,10 @@ expect fun LockOrientation(locked: Boolean)
 @Composable
 expect fun rememberEnterPip(): (Float) -> Unit
 
+/** True while the app shows as a Picture-in-Picture window. */
+@Composable
+expect fun rememberInPictureInPicture(): Boolean
+
 /** Handles the system back gesture where the platform has one (Android). */
 @Composable
 expect fun PlatformBackHandler(enabled: Boolean, onBack: () -> Unit)

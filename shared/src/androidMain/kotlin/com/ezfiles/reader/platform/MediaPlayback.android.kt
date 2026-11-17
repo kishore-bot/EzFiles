@@ -54,7 +54,7 @@ import java.util.Locale
  * source, and deleted on release. Audio focus is ExoPlayer's.
  */
 @OptIn(UnstableApi::class)
-private class AndroidMediaPlayer(context: Context, private val lifecycle: Lifecycle) : MediaPlayerState {
+private class AndroidMediaPlayer(context: Context, private val lifecycle: Lifecycle, private val inPip: () -> Boolean) : MediaPlayerState {
     private val keyguard = context.getSystemService(KeyguardManager::class.java)
     private val power = context.getSystemService(PowerManager::class.java)
     val player: ExoPlayer = ExoPlayer.Builder(
@@ -144,7 +144,9 @@ private class AndroidMediaPlayer(context: Context, private val lifecycle: Lifecy
 
     override fun play() {
         // Preparation may finish after the device locks or the app leaves the foreground.
-        if (released || status != MediaStatus.Ready || !lifecycle.currentState.isAtLeast(Lifecycle.State.RESUMED) ||
+        // In Picture-in-Picture the activity is only started, yet the video should play.
+        val visible = lifecycle.currentState.isAtLeast(if (inPip()) Lifecycle.State.STARTED else Lifecycle.State.RESUMED)
+        if (released || status != MediaStatus.Ready || !visible ||
             keyguard?.isKeyguardLocked == true || power?.isInteractive == false) return
         if (playing) return
         if (player.playbackState == Player.STATE_ENDED) player.seekTo(0)
@@ -285,7 +287,8 @@ private class AndroidMediaPlayer(context: Context, private val lifecycle: Lifecy
 actual fun rememberMediaPlayer(source: MediaSource): MediaPlayerState {
     val context = LocalContext.current.applicationContext
     val lifecycle = LocalLifecycleOwner.current.lifecycle
-    val state = remember(source, lifecycle) { AndroidMediaPlayer(context, lifecycle) }
+    val activity = LocalContext.current.findActivity()
+    val state = remember(source, lifecycle) { AndroidMediaPlayer(context, lifecycle) { activity?.isInPictureInPictureMode == true } }
     DisposableEffect(state) { onDispose { state.release() } }
 
     LaunchedEffect(state) {
@@ -306,7 +309,12 @@ actual fun rememberMediaPlayer(source: MediaSource): MediaPlayerState {
     }
     // Leaving the app pauses playback.
     DisposableEffect(lifecycle, state) {
-        val observer = LifecycleEventObserver { _, event -> if (event == Lifecycle.Event.ON_PAUSE) state.pause() }
+        // Not when shrinking to Picture-in-Picture: that pauses the activity but should keep playing.
+        val observer = LifecycleEventObserver { _, event ->
+            if (event == Lifecycle.Event.ON_PAUSE && activity?.isInPictureInPictureMode != true) state.pause()
+            // Closing the PiP window stops the activity: stop playing then.
+            if (event == Lifecycle.Event.ON_STOP) state.pause()
+        }
         lifecycle.addObserver(observer)
         onDispose { lifecycle.removeObserver(observer) }
     }
@@ -428,4 +436,10 @@ actual fun rememberModelFilePicker(onResult: (List<String>) -> Unit): () -> Unit
         onResult(uris.map(Uri::toString))
     }
     return remember(launcher) { { launcher.launch(arrayOf("*/*")) } }
+}
+
+private fun Context.findActivity(): android.app.Activity? = when (this) {
+    is android.app.Activity -> this
+    is android.content.ContextWrapper -> baseContext.findActivity()
+    else -> null
 }

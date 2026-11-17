@@ -42,6 +42,18 @@ if [[ ! -f "$SRC/configure" ]]; then
   tar -xJf "$ARCHIVE" -C "$SRC" --strip-components=1
 fi
 
+# What "make install" would do, by plain copies: its install(1) calls fail under the NDK's
+# Windows make. Public headers (plus the two generated ones) and the three shared libraries.
+install_abi() {
+  local abi=$1 build="$OUT/build-$1" dest="$OUT/$1"
+  for lib in libavutil libavcodec libswresample; do
+    mkdir -p "$dest/include/$lib" "$dest/lib"
+    cp "$SRC/$lib"/*.h "$dest/include/$lib/"
+    cp "$build/$lib/$lib.so" "$dest/lib/"
+  done
+  cp "$build/libavutil/avconfig.h" "$build/libavutil/ffversion.h" "$dest/include/libavutil/"
+}
+
 for ABI in "${ABIS[@]}"; do
   if [[ -f "$OUT/$ABI/lib/libavcodec.so" ]]; then echo "$ABI: already built"; continue; fi
   case "$ABI" in
@@ -70,7 +82,7 @@ for ABI in "${ABIS[@]}"; do
   # The licence must stay LGPL: configure prints it.
   grep -q "License: LGPL" configure.log || { echo "Not an LGPL configuration" >&2; grep -i license configure.log; exit 1; }
   "$MAKE" -j"$(nproc 2>/dev/null || echo 4)" > make.log 2>&1 || { tail -40 make.log; exit 1; }
-  "$MAKE" install > install.log 2>&1
+  install_abi "$ABI"
   echo "$ABI: built $(ls "$OUT/$ABI/lib"/*.so | xargs -n1 basename | tr '\n' ' ')"
 done
 cp "$SRC/COPYING.LGPLv2.1" "$OUT/COPYING.LGPLv2.1"

@@ -64,6 +64,9 @@ kotlin {
             implementation(libs.camera.lifecycle)
             implementation(libs.camera.view)
             implementation(libs.mlkit.text.recognition)
+            // Video and audio: ExoPlayer, with FFmpeg for audio formats the phone can't decode.
+            implementation(libs.media3.exoplayer)
+            implementation(project(":ffmpeg"))
         }
     }
 }

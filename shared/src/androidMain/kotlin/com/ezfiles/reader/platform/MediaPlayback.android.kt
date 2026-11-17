@@ -1,20 +1,14 @@
 package com.ezfiles.reader.platform
 
 import android.content.Context
-import android.media.AudioAttributes
-import android.media.AudioFocusRequest
-import android.media.AudioManager
-import android.media.MediaFormat
-import android.media.MediaPlayer
 import android.app.KeyguardManager
 import android.net.Uri
-import android.os.Build
 import android.os.PowerManager
 import android.provider.DocumentsContract
-import android.view.SurfaceHolder
-import android.view.SurfaceView
+import android.view.TextureView
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.annotation.OptIn
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
@@ -30,6 +24,20 @@ import androidx.compose.ui.viewinterop.AndroidView
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
+import androidx.media3.common.AudioAttributes
+import androidx.media3.common.C
+import androidx.media3.common.Format
+import androidx.media3.common.MediaItem
+import androidx.media3.common.MimeTypes
+import androidx.media3.common.PlaybackException
+import androidx.media3.common.Player
+import androidx.media3.common.TrackSelectionOverride
+import androidx.media3.common.Tracks
+import androidx.media3.common.VideoSize
+import androidx.media3.common.text.CueGroup
+import androidx.media3.common.util.UnstableApi
+import androidx.media3.exoplayer.DefaultRenderersFactory
+import androidx.media3.exoplayer.ExoPlayer
 import com.ezfiles.reader.domain.DocumentRef
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
@@ -40,23 +48,28 @@ import java.io.IOException
 import java.util.Locale
 
 /**
- * `android.media.MediaPlayer`: built in, so playback adds nothing to the app.
- * Embedded media is written to a private cache file first, because the player
- * needs a seekable source, and deleted on release.
+ * Media3 ExoPlayer. Video uses the phone's hardware decoders; audio the phone can't decode itself
+ * (E-AC3/Dolby Digital Plus, AC3, DTS, TrueHD…) goes through FFmpeg's LGPL decoders (:ffmpeg).
+ * Embedded media is written to a private cache file first, because the player needs a seekable
+ * source, and deleted on release. Audio focus is ExoPlayer's.
  */
+@OptIn(UnstableApi::class)
 private class AndroidMediaPlayer(context: Context, private val lifecycle: Lifecycle) : MediaPlayerState {
-    val player = MediaPlayer()
-    private val audio = context.getSystemService(AudioManager::class.java)
     private val keyguard = context.getSystemService(KeyguardManager::class.java)
     private val power = context.getSystemService(PowerManager::class.java)
-    private val audioAttributes = AudioAttributes.Builder().setUsage(AudioAttributes.USAGE_MEDIA)
-        .setContentType(AudioAttributes.CONTENT_TYPE_MOVIE).build()
-    private val focus = AudioFocusRequest.Builder(AudioManager.AUDIOFOCUS_GAIN)
-        .setAudioAttributes(audioAttributes).setOnAudioFocusChangeListener { change ->
-            if (change < 0 && !released) pause()
-        }.build()
+    val player: ExoPlayer = ExoPlayer.Builder(
+        context,
+        DefaultRenderersFactory(context)
+            // The phone's own decoders first; FFmpeg only for what they can't play.
+            .setExtensionRendererMode(DefaultRenderersFactory.EXTENSION_RENDERER_MODE_ON)
+            .setEnableDecoderFallback(true),
+    ).setAudioAttributes(
+        AudioAttributes.Builder().setUsage(C.USAGE_MEDIA).setContentType(C.AUDIO_CONTENT_TYPE_MOVIE).build(),
+        /* handleAudioFocus = */ true,
+    ).setHandleAudioBecomingNoisy(true).build()
     var file: File? = null
     var released = false
+    private var startedOnce = false
 
     override var status: MediaStatus by mutableStateOf(MediaStatus.Preparing)
     override var playing by mutableStateOf(false)
@@ -70,69 +83,110 @@ private class AndroidMediaPlayer(context: Context, private val lifecycle: Lifecy
     override var externalSubtitles: SubtitleDocument? by mutableStateOf(null)
     override var subtitleText by mutableStateOf("")
     override var trackProblem: String? by mutableStateOf(null)
-    private var subtitleStart = 0L
-    private var subtitleEnd = Long.MAX_VALUE
+
+    /** Track id ("audio:2:0") → the group and index ExoPlayer selects by. */
+    private val trackGroups = HashMap<String, Pair<Tracks.Group, Int>>()
+
+    init {
+        player.addListener(object : Player.Listener {
+            override fun onPlaybackStateChanged(state: Int) {
+                if (released) return
+                when (state) {
+                    Player.STATE_READY -> {
+                        durationMs = player.duration.takeIf { it != C.TIME_UNSET }?.coerceAtLeast(0) ?: 0
+                        status = MediaStatus.Ready
+                        if (!startedOnce) {
+                            startedOnce = true
+                            play()
+                        }
+                    }
+                    Player.STATE_ENDED -> {
+                        playbackEnded()
+                        positionMs = durationMs
+                    }
+                    else -> {}
+                }
+            }
+
+            override fun onIsPlayingChanged(isPlaying: Boolean) {
+                // Focus loss, unplugged headphones and the end of the file stop it from outside.
+                if (!isPlaying && !player.playWhenReady) playing = false
+            }
+
+            override fun onVideoSizeChanged(size: VideoSize) {
+                if (size.width > 0 && size.height > 0) videoAspect = size.width * size.pixelWidthHeightRatio / size.height
+            }
+
+            override fun onTracksChanged(tracks: Tracks) = refreshTracks(tracks)
+
+            override fun onCues(cueGroup: CueGroup) {
+                if (selectedSubtitleTrack == null || selectedSubtitleTrack == "external") return
+                subtitleText = plainSubtitleText(cueGroup.cues.mapNotNull { it.text?.toString() }.joinToString("\n"))
+            }
+
+            override fun onPlayerError(error: PlaybackException) {
+                playbackEnded()
+                status = MediaStatus.Failed(
+                    when (error.errorCode) {
+                        PlaybackException.ERROR_CODE_DECODER_INIT_FAILED, PlaybackException.ERROR_CODE_DECODER_QUERY_FAILED,
+                        PlaybackException.ERROR_CODE_DECODING_FORMAT_UNSUPPORTED, PlaybackException.ERROR_CODE_DECODING_FORMAT_EXCEEDS_CAPABILITIES ->
+                            "This phone can't decode this video's picture format."
+                        PlaybackException.ERROR_CODE_PARSING_CONTAINER_UNSUPPORTED, PlaybackException.ERROR_CODE_PARSING_CONTAINER_MALFORMED ->
+                            "This file's format isn't supported or it is damaged."
+                        PlaybackException.ERROR_CODE_IO_FILE_NOT_FOUND, PlaybackException.ERROR_CODE_IO_NO_PERMISSION ->
+                            "This file can't be read any more. Open it again."
+                        else -> "This file can't be played on this device."
+                    },
+                )
+            }
+        })
+    }
 
     override fun play() {
         // Preparation may finish after the device locks or the app leaves the foreground.
         if (released || status != MediaStatus.Ready || !lifecycle.currentState.isAtLeast(Lifecycle.State.RESUMED) ||
             keyguard?.isKeyguardLocked == true || power?.isInteractive == false) return
         if (playing) return
-        if (audio != null && audio.requestAudioFocus(focus) != AudioManager.AUDIOFOCUS_REQUEST_GRANTED) {
-            trackProblem = "Another app is using audio. Try Play again when it finishes."
-            return
-        }
-        if (positionMs >= durationMs && durationMs > 0) seekTo(0)
-        try {
-            player.start()
-            playing = true
-        } catch (_: IllegalStateException) {
-            audio?.abandonAudioFocusRequest(focus)
-            trackProblem = "Playback could not start. Open the file again."
-        }
+        if (player.playbackState == Player.STATE_ENDED) player.seekTo(0)
+        player.play()
+        playing = true
     }
 
     override fun pause() {
-        if (released || status != MediaStatus.Ready) return
-        try {
-            if (player.isPlaying) player.pause()
-            updatePosition()
-        } catch (_: RuntimeException) {
-            trackProblem = "Playback is no longer available. Open the file again."
-        } finally {
-            playing = false
-            audio?.abandonAudioFocusRequest(focus)
-        }
+        if (released) return
+        player.pause()
+        updatePosition()
+        playing = false
     }
 
     override fun seekTo(positionMs: Long) {
         if (status != MediaStatus.Ready) return
         val target = positionMs.coerceIn(0, durationMs.coerceAtLeast(0))
-        try {
-            player.seekTo(target, MediaPlayer.SEEK_CLOSEST)
-            this.positionMs = target
-            subtitleText = ""
-        } catch (_: RuntimeException) {
-            trackProblem = "This file cannot seek to that position on this device."
-        }
+        player.seekTo(target)
+        this.positionMs = target
+        subtitleText = ""
     }
 
     override fun selectAudioTrack(id: String) = trackChange {
-        val track = audioTracks.firstOrNull { it.id == id && it.supported } ?: return@trackChange
-        player.selectTrack(track.id.toInt())
-        selectedAudioTrack = track.id
+        val (group, index) = trackGroups[id] ?: return@trackChange
+        if (!group.isTrackSupported(index)) return@trackChange
+        player.trackSelectionParameters = player.trackSelectionParameters.buildUpon()
+            .setOverrideForType(TrackSelectionOverride(group.mediaTrackGroup, index)).build()
+        selectedAudioTrack = id
     }
 
     override fun selectSubtitleTrack(id: String?) = trackChange {
-        val track = id?.takeUnless { it == "external" }?.let { candidate ->
-            subtitleTracks.firstOrNull { it.id == candidate && it.supported } ?: return@trackChange
-        }
         if (id == "external" && externalSubtitles == null) return@trackChange
-        val previous = selectedSubtitleTrack?.toIntOrNull()
-        selectedSubtitleTrack = null
         subtitleText = ""
-        previous?.let(player::deselectTrack)
-        if (track != null) player.selectTrack(track.id.toInt())
+        val builder = player.trackSelectionParameters.buildUpon()
+        val embedded = id?.takeUnless { it == "external" }?.let { trackGroups[it] ?: return@trackChange }
+        if (embedded == null) {
+            builder.setTrackTypeDisabled(C.TRACK_TYPE_TEXT, true)
+        } else {
+            builder.setTrackTypeDisabled(C.TRACK_TYPE_TEXT, false)
+                .setOverrideForType(TrackSelectionOverride(embedded.first.mediaTrackGroup, embedded.second))
+        }
+        player.trackSelectionParameters = builder.build()
         selectedSubtitleTrack = id
     }
 
@@ -150,58 +204,78 @@ private class AndroidMediaPlayer(context: Context, private val lifecycle: Lifecy
         }
     }
 
-    fun refreshTracks() {
-        if (released || status != MediaStatus.Ready) return
-        try {
-            val tracks = player.trackInfo
-            fun label(language: String, fallback: String): String = language.takeUnless { it.isBlank() || it == "und" }
-                ?.let { Locale.forLanguageTag(it).getDisplayLanguage(Locale.getDefault()).takeIf(String::isNotBlank) } ?: fallback
-            audioTracks = tracks.mapIndexedNotNull { index, info ->
-                if (info.trackType != MediaPlayer.TrackInfo.MEDIA_TRACK_TYPE_AUDIO) null
-                else MediaTrack(index.toString(), info.language, label(info.language, "Audio ${index + 1}"))
-            }
-            subtitleTracks = tracks.mapIndexedNotNull { index, info ->
-                if (info.trackType != MediaPlayer.TrackInfo.MEDIA_TRACK_TYPE_TIMEDTEXT && info.trackType != MediaPlayer.TrackInfo.MEDIA_TRACK_TYPE_SUBTITLE) null
-                else {
-                    val mime = info.format?.getString(MediaFormat.KEY_MIME).orEmpty()
-                    val supported = info.trackType == MediaPlayer.TrackInfo.MEDIA_TRACK_TYPE_TIMEDTEXT ||
-                        (Build.VERSION.SDK_INT >= 28 && mime == "text/vtt")
-                    MediaTrack(index.toString(), info.language, label(info.language, "Subtitles ${index + 1}") + if (supported) "" else " (unsupported format)", supported)
+    private fun refreshTracks(tracks: Tracks) {
+        if (released) return
+        trackGroups.clear()
+        val audio = ArrayList<MediaTrack>()
+        val text = ArrayList<MediaTrack>()
+        var selectedAudio: String? = null
+        var selectedText: String? = null
+        tracks.groups.forEachIndexed { g, group ->
+            for (i in 0 until group.length) {
+                val format = group.getTrackFormat(i)
+                when (group.type) {
+                    C.TRACK_TYPE_AUDIO -> {
+                        val id = "audio:$g:$i"
+                        trackGroups[id] = group to i
+                        val supported = group.isTrackSupported(i)
+                        audio += MediaTrack(id, format.language.orEmpty(), audioLabel(format, audio.size) + if (supported) "" else " (can't play here)", supported)
+                        if (group.isTrackSelected(i)) selectedAudio = id
+                    }
+                    C.TRACK_TYPE_TEXT -> {
+                        val id = "text:$g:$i"
+                        trackGroups[id] = group to i
+                        val supported = group.isTrackSupported(i)
+                        val name = format.label ?: language(format.language) ?: "Subtitles ${text.size + 1}"
+                        text += MediaTrack(id, format.language.orEmpty(), name + if (supported) "" else " (unsupported format)", supported)
+                        if (group.isTrackSelected(i)) selectedText = id
+                    }
                 }
             }
-            selectedAudioTrack = player.getSelectedTrack(MediaPlayer.TrackInfo.MEDIA_TRACK_TYPE_AUDIO).takeIf { it >= 0 }?.toString()
-        } catch (_: RuntimeException) {
-            trackProblem = "Track information is unavailable on this device."
         }
+        audioTracks = audio
+        subtitleTracks = text
+        selectedAudioTrack = selectedAudio
+        if (selectedSubtitleTrack != "external") selectedSubtitleTrack = selectedText
+        // Every audio track unplayable: say so plainly rather than playing in silence.
+        trackProblem = if (audio.isNotEmpty() && audio.none { it.supported }) {
+            "This video's sound (${audio.first().label.substringBefore(" (")}) can't be played on this phone."
+        } else trackProblem
     }
 
-    fun showSubtitle(text: String, startMs: Long = 0, endMs: Long = Long.MAX_VALUE) {
-        if (released || selectedSubtitleTrack == null || selectedSubtitleTrack == "external") return
-        subtitleText = plainSubtitleText(text)
-        subtitleStart = startMs
-        subtitleEnd = endMs
+    private fun language(code: String?): String? = code?.takeUnless { it.isBlank() || it == "und" }
+        ?.let { Locale.forLanguageTag(it).getDisplayLanguage(Locale.getDefault()).takeIf(String::isNotBlank) }
+
+    /** "English · E-AC3 5.1", as a player lists them. */
+    private fun audioLabel(format: Format, index: Int): String {
+        val name = format.label ?: language(format.language) ?: "Audio ${index + 1}"
+        val codec = when (format.sampleMimeType) {
+            MimeTypes.AUDIO_E_AC3, MimeTypes.AUDIO_E_AC3_JOC -> "E-AC3"
+            MimeTypes.AUDIO_AC3 -> "AC3"
+            MimeTypes.AUDIO_DTS, MimeTypes.AUDIO_DTS_HD, MimeTypes.AUDIO_DTS_EXPRESS -> "DTS"
+            MimeTypes.AUDIO_TRUEHD -> "TrueHD"
+            MimeTypes.AUDIO_AAC -> "AAC"
+            MimeTypes.AUDIO_OPUS -> "Opus"
+            MimeTypes.AUDIO_FLAC -> "FLAC"
+            MimeTypes.AUDIO_MPEG -> "MP3"
+            else -> null
+        }
+        val channels = when (format.channelCount) { 6 -> "5.1"; 8 -> "7.1"; 2 -> "stereo"; 1 -> "mono"; else -> null }
+        return listOfNotNull(name, listOfNotNull(codec, channels).joinToString(" ").takeIf(String::isNotBlank)).joinToString(" · ")
     }
 
     fun updatePosition() {
-        try {
-            positionMs = player.currentPosition.toLong()
-            if (positionMs < subtitleStart || positionMs >= subtitleEnd) subtitleText = ""
-        } catch (_: RuntimeException) {
-            playing = false
-            audio?.abandonAudioFocusRequest(focus)
-            trackProblem = "Playback is no longer available. Open the file again."
-        }
+        if (released) return
+        positionMs = player.currentPosition.coerceAtLeast(0)
     }
 
     fun playbackEnded() {
         playing = false
         subtitleText = ""
-        audio?.abandonAudioFocusRequest(focus)
     }
 
     fun release() {
         released = true
-        audio?.abandonAudioFocusRequest(focus)
         player.release()
         file?.delete()
     }
@@ -223,7 +297,7 @@ actual fun rememberMediaPlayer(source: MediaSource): MediaPlayerState {
             if (!state.released) state.status = MediaStatus.Failed(e.message ?: "This file can't be played.")
         }
     }
-    // The player has no position callback; poll it while playing.
+    // Position for the seek bar and external subtitles, while playing.
     LaunchedEffect(state, state.playing) {
         while (state.playing && !state.released) {
             state.updatePosition()
@@ -240,12 +314,8 @@ actual fun rememberMediaPlayer(source: MediaSource): MediaPlayerState {
 }
 
 private suspend fun prepare(context: Context, state: AndroidMediaPlayer, source: MediaSource) {
-    val player = state.player
-    player.setAudioAttributes(
-        AudioAttributes.Builder().setUsage(AudioAttributes.USAGE_MEDIA).setContentType(AudioAttributes.CONTENT_TYPE_MOVIE).build(),
-    )
-    when (source) {
-        is MediaSource.File -> player.setDataSource(context, Uri.parse(source.ref.uri))
+    val uri = when (source) {
+        is MediaSource.File -> Uri.parse(source.ref.uri)
         is MediaSource.Embedded -> {
             val file = withContext(Dispatchers.IO) {
                 val bytes = source.load() ?: throw IOException("This media file can't be read from the document.")
@@ -258,68 +328,23 @@ private suspend fun prepare(context: Context, state: AndroidMediaPlayer, source:
                 return
             }
             state.file = file
-            player.setDataSource(file.path)
+            Uri.fromFile(file)
         }
     }
-    player.setOnPreparedListener {
-        if (state.released) return@setOnPreparedListener
-        state.durationMs = it.duration.toLong().coerceAtLeast(0)
-        if (it.videoWidth > 0 && it.videoHeight > 0) state.videoAspect = it.videoWidth.toFloat() / it.videoHeight
-        state.status = MediaStatus.Ready
-        state.refreshTracks()
-        state.play()
-    }
-    player.setOnTimedTextListener { _, text -> state.showSubtitle(text?.text.orEmpty()) }
-    if (Build.VERSION.SDK_INT >= 28) {
-        player.setOnSubtitleDataListener { _, data ->
-            if (state.selectedSubtitleTrack == data.trackIndex.toString()) {
-                state.showSubtitle(embeddedWebVtt(data.data), data.startTimeUs / 1_000,
-                    (data.startTimeUs + data.durationUs) / 1_000)
-            }
-        }
-    }
-    player.setOnInfoListener { _, what, _ ->
-        if (what == MediaPlayer.MEDIA_INFO_METADATA_UPDATE) state.refreshTracks()
-        false
-    }
-    player.setOnVideoSizeChangedListener { _, width, height ->
-        if (width > 0 && height > 0) state.videoAspect = width.toFloat() / height
-    }
-    player.setOnCompletionListener {
-        state.playbackEnded()
-        state.positionMs = state.durationMs
-    }
-    player.setOnErrorListener { _, _, _ ->
-        state.playbackEnded()
-        state.status = MediaStatus.Failed("This file can't be played on this device.")
-        true
-    }
-    player.prepareAsync()
+    state.player.setMediaItem(MediaItem.fromUri(uri))
+    state.player.prepare()
 }
 
+@OptIn(UnstableApi::class)
 @Composable
 actual fun VideoSurface(player: MediaPlayerState, modifier: Modifier) {
     val android = player as? AndroidMediaPlayer ?: return
+    // A TextureView, so the picture can be cropped, stretched and pinch-zoomed like any other view.
     AndroidView(
-        factory = { context ->
-            SurfaceView(context).apply {
-                holder.addCallback(
-                    object : SurfaceHolder.Callback {
-                        override fun surfaceCreated(holder: SurfaceHolder) {
-                            if (!android.released) android.player.setDisplay(holder)
-                        }
-
-                        override fun surfaceChanged(holder: SurfaceHolder, format: Int, width: Int, height: Int) = Unit
-
-                        override fun surfaceDestroyed(holder: SurfaceHolder) {
-                            if (!android.released) android.player.setDisplay(null)
-                        }
-                    },
-                )
-            }
-        },
+        factory = { context -> TextureView(context).also { if (!android.released) android.player.setVideoTextureView(it) } },
         modifier = modifier,
         update = { it.keepScreenOn = android.playing },
+        onRelease = { if (!android.released) android.player.clearVideoTextureView(it) },
     )
 }
 

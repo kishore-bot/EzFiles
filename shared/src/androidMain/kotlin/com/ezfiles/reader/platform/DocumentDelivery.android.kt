@@ -20,6 +20,10 @@ import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleOwner
 import com.ezfiles.reader.data.AndroidPdfCreator
 import com.ezfiles.reader.data.AndroidPdfTools
+import com.ezfiles.reader.data.AndroidDocumentAccess
+import com.ezfiles.reader.data.AndroidDocumentPdf
+import com.ezfiles.reader.data.RustDocumentReader
+import com.ezfiles.reader.domain.ReadLimits
 import com.ezfiles.reader.domain.DocumentError
 import com.ezfiles.reader.domain.DocumentException
 import com.ezfiles.reader.domain.DocumentRef
@@ -155,7 +159,7 @@ private class AndroidDocumentDelivery(private val context: Context) : DocumentDe
 
     override suspend fun print(ref: DocumentRef, password: String?) = deliveryErrors {
         foreground()
-        val kind = printKind(ref) ?: throw DocumentException(DocumentError.Unsupported("Print supports PDF, pictures and plain-text files. Export this format to PDF first."))
+        val kind = printKind(ref) ?: throw DocumentException(DocumentError.Unsupported("Sound and video files can't be printed."))
         val prepared = staged { directory ->
             // A protected input and its permitted printable copy can coexist briefly.
             DeliveryFiles.checkRoom(app, DeliveryFiles.MAX_FILE_BYTES * 2)
@@ -170,8 +174,9 @@ private class AndroidDocumentDelivery(private val context: Context) : DocumentDe
                         val input = PdfSource(deliveryUri(app, snapshot).toString(), password)
                         val info = pdf.inspect(input)
                         if (info.encrypted) {
-                            // Rebuild enforces owner restrictions before producing the private printable copy.
-                            pdf.rebuild(input, List(info.pageCount) { PdfPageEdit(it) }, targetUri)
+                            // A plain private copy for the spooler. It needs only the print permission, so a
+                            // watermarked PDF that opens for anyone doesn't ask for its owner password.
+                            pdf.printCopy(input, info.pageCount, targetUri)
                         } else if (!snapshot.renameTo(target)) {
                             throw IOException("The private print copy could not be prepared.")
                         }
@@ -187,6 +192,10 @@ private class AndroidDocumentDelivery(private val context: Context) : DocumentDe
                 PrintKind.Text -> {
                     val bytes = readTextBytes(source)
                     creator.textToPdf(decodePrintText(bytes), TextPdfStyle.of(TextPdfTemplate.MinimalLetter), targetUri)
+                }
+                // Any other format: the engine reads it, and it is laid out as a PDF to print.
+                PrintKind.Document -> RustDocumentReader(AndroidDocumentAccess.get(app)).open(ref, ReadLimits.Default, password = password).use { session ->
+                    target.outputStream().use { AndroidDocumentPdf(session).write(it) }
                 }
             }
             if (target.length() > DeliveryFiles.MAX_FILE_BYTES) throw DocumentException(DocumentError.LimitExceeded("This print document exceeds the 64 MiB delivery limit."))

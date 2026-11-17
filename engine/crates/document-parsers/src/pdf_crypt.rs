@@ -90,6 +90,11 @@ impl Permissions {
         self.bits & MODIFY != 0
     }
 
+    /// Printing at all (bit 3). A watermarked PDF often allows it while forbidding changes.
+    pub(crate) fn may_print(self) -> bool {
+        self.bits & PRINT != 0
+    }
+
     /// What the file forbids, in words, for a message.
     pub(crate) fn denied(self) -> Vec<&'static str> {
         let mut denied = Vec::new();

@@ -20,14 +20,22 @@ interface DocumentDelivery {
 @Composable
 expect fun rememberDocumentDelivery(): DocumentDelivery
 
-internal enum class PrintKind { Pdf, Image, Text }
+/** [Document]: any other file the engine reads (Word, slides, sheets, books, web pages…), printed as a PDF made first. */
+internal enum class PrintKind { Pdf, Image, Text, Document }
+
+/** Sound and video have nothing to print. */
+private val unprintable = setOf(
+    "mp3", "m4a", "aac", "wav", "flac", "ogg", "oga", "opus", "wma", "amr", "mid", "midi",
+    "mp4", "m4v", "mkv", "webm", "mov", "avi", "3gp", "m2ts", "wmv", "flv", "mpg", "mpeg",
+)
 
 internal fun printKind(ref: DocumentRef): PrintKind? = when (ref.displayName.substringAfterLast('.', "").lowercase()) {
     "pdf" -> PrintKind.Pdf
     "jpg", "jpeg", "png", "webp", "gif", "bmp", "heic", "heif", "avif" -> PrintKind.Image
     "txt", "text", "log", "md", "markdown", "csv", "tsv", "json", "xml", "yaml", "yml",
     "toml", "ini", "cfg", "kt", "kts", "java", "py", "js", "ts", "css", "rs", "c", "h", "cpp", "sh" -> PrintKind.Text
-    else -> null
+    in unprintable, "" -> null
+    else -> PrintKind.Document
 }
 
 /** Clamp and merge printer ranges before enumerating pages, including ALL_PAGES (Int.MAX_VALUE). */

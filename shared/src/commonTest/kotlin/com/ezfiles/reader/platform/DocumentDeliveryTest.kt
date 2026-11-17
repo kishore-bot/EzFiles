@@ -19,10 +19,15 @@ class DocumentDeliveryTest {
     }
 
     @Test
-    fun richFormatsRequireAnExplicitExportBeforePrinting() {
-        for (extension in listOf("docx", "xlsx", "pptx", "epub", "html", "zip")) {
-            assertNull(printKind(DocumentRef("content://example/file", "document.$extension")))
+    fun everyDocumentPrintsThroughAPdfButSoundAndVideoDoNot() {
+        for (extension in listOf("docx", "xlsx", "pptx", "odt", "epub", "html", "rtf", "zip")) {
+            assertEquals(PrintKind.Document, printKind(DocumentRef("content://example/file", "document.$extension")))
         }
+        for (extension in listOf("mp4", "mkv", "mp3", "flac", "mov")) {
+            assertNull(printKind(DocumentRef("content://example/file", "media.$extension")))
+        }
+        assertNull(printKind(DocumentRef("content://example/file", "no-extension")))
+        assertEquals(PrintKind.Text, printKind(DocumentRef("content://example/file", "app.ts")))
         assertEquals(PrintKind.Pdf, printKind(DocumentRef("content://example/file", "Document.PDF")))
         assertEquals(PrintKind.Image, printKind(DocumentRef("content://example/file", "photo.jpg")))
         assertEquals(PrintKind.Text, printKind(DocumentRef("content://example/file", "notes.txt")))

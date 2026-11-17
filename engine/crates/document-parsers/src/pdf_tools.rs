@@ -74,6 +74,10 @@ pub enum PdfToolOp {
         password: Zeroizing<String>,
     },
     RemovePassword,
+    /// Every page as it is, unprotected, only for the print spooler (a private file deleted after
+    /// printing). Needs just the print permission: a watermarked PDF that opens for anyone and allows
+    /// printing must print without asking for its owner password.
+    PrintCopy,
 }
 
 /// Told how a rewrite is going; asked if it should go on. Called on the rewriting thread.
@@ -109,6 +113,8 @@ pub struct PdfToolInfo {
     pub encrypted: bool,
     pub signed: bool,
     pub archival: bool,
+    /// False only when the file forbids printing to someone without the owner password.
+    pub printable: bool,
 }
 
 fn password_given(password: Option<&str>) -> Option<&str> {
@@ -125,7 +131,8 @@ pub fn inspect_for_tools<R: Read + Seek>(source: R, password: Option<&str>) -> R
     file.unlock(password_given(password))?;
     let pages = file.pages()?;
     let (signed, archival) = file.warnings()?;
-    Ok(PdfToolInfo { page_count: pages.len() as u32, encrypted, signed, archival })
+    let printable = file.crypt.as_ref().is_none_or(|crypt| crypt.is_owner || crypt.permissions.may_print());
+    Ok(PdfToolInfo { page_count: pages.len() as u32, encrypted, signed, archival, printable })
 }
 
 /// Writes the result of `op` to `out`. The sources are only read.
@@ -290,6 +297,16 @@ fn check_permissions<R: Read + Seek>(file: &PdfFile<R>, op: &PdfToolOp) -> Resul
         return Ok(());
     }
     let permissions = crypt.permissions;
+    if matches!(op, PdfToolOp::PrintCopy) {
+        return if permissions.may_print() {
+            Ok(())
+        } else {
+            Err(EngineError::new(
+                ErrorKind::PasswordRequired,
+                "The owner of this PDF doesn't allow printing. Enter the owner password to print it.".to_owned(),
+            ))
+        };
+    }
     let denied = permissions.denied();
     let refused = |what: String| {
         Err(EngineError::new(ErrorKind::PasswordRequired, format!("{what} Enter the owner password to continue.")))
@@ -365,7 +382,7 @@ fn choose_pages<R: Read + Seek>(sources: &[Source<R>], op: &PdfToolOp) -> Result
             }
             all(0).collect()
         }
-        PdfToolOp::AddPassword { .. } | PdfToolOp::RemovePassword => all(0).collect(),
+        PdfToolOp::AddPassword { .. } | PdfToolOp::RemovePassword | PdfToolOp::PrintCopy => all(0).collect(),
     };
     if picks.len() > MAX_OUTPUT_PAGES {
         return Err(EngineError::limit("too many pages for one PDF"));

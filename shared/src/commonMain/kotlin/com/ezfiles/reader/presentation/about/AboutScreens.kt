@@ -1,5 +1,7 @@
 package com.ezfiles.reader.presentation.about
 
+import com.ezfiles.reader.platform.SpeechEngine
+
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -92,6 +94,9 @@ fun AboutPages(
     onAssistantChange: (Boolean) -> Unit = {},
     contentEnabled: Boolean = false,
     onContentChange: (Boolean) -> Unit = {},
+    /** Null hides the speech engine choice (no setting on this platform). */
+    speechEngine: SpeechEngine? = null,
+    onSpeechEngineChange: (SpeechEngine) -> Unit = {},
 ) {
     val back = { onRouteChange(if (route == AboutRoute.VisionFromAbout) AboutRoute.About else null) }
     PlatformBackHandler(enabled = true, onBack = back)
@@ -109,6 +114,8 @@ fun AboutPages(
             onAssistantChange = onAssistantChange,
             contentEnabled = contentEnabled,
             onContentChange = onContentChange,
+            speechEngine = speechEngine,
+            onSpeechEngineChange = onSpeechEngineChange,
         )
         AboutRoute.Vision, AboutRoute.VisionFromAbout -> VisionScreen(onBack = back)
     }
@@ -250,6 +257,9 @@ fun AboutScreen(
     onAssistantChange: (Boolean) -> Unit = {},
     contentEnabled: Boolean = false,
     onContentChange: (Boolean) -> Unit = {},
+    /** Null hides the speech engine choice (no setting on this platform). */
+    speechEngine: SpeechEngine? = null,
+    onSpeechEngineChange: (SpeechEngine) -> Unit = {},
 ) {
     val appInfo = LocalAppInfo.current
     var showingLicences by rememberSaveable { mutableStateOf(false) }
@@ -257,7 +267,8 @@ fun AboutScreen(
     AboutFrame("About EzFiles", onBack) {
         AppHeader()
         Spacer(Modifier.height(20.dp))
-        AppearanceCard(theme, onThemeChange, haptics, onHapticsChange, assistantEnabled, onAssistantChange, contentEnabled, onContentChange)
+        AppearanceCard(theme, onThemeChange, haptics, onHapticsChange, assistantEnabled, onAssistantChange, contentEnabled, onContentChange,
+            speechEngine, onSpeechEngineChange)
         Spacer(Modifier.height(12.dp))
         NavigationCard(
             icon = AboutIcons.Heart,
@@ -385,6 +396,8 @@ private fun AppearanceCard(
     onAssistantChange: (Boolean) -> Unit,
     contentEnabled: Boolean,
     onContentChange: (Boolean) -> Unit,
+    speechEngine: SpeechEngine?,
+    onSpeechEngineChange: (SpeechEngine) -> Unit,
 ) {
     Column(
         Modifier.fillMaxWidth().glass(EzShapes.Card, 0.55f).padding(16.dp),
@@ -417,6 +430,22 @@ private fun AppearanceCard(
                 checked = contentEnabled,
                 onCheckedChange = onContentChange,
             )
+            if (speechEngine != null) {
+                Text("Speech recognition", style = MaterialTheme.typography.bodyLarge, color = EzColors.Text)
+                Text(
+                    if (speechEngine == SpeechEngine.Moonshine) "Moonshine Base, English only, on this device. Listens until you pause, then reads it all at once."
+                    else "The phone's own on-device recognizer, tuned towards your file names and Fily's commands.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = EzColors.TextSecondary,
+                )
+                EzSegmented(
+                    options = SpeechEngine.entries,
+                    selected = speechEngine,
+                    label = { it.label },
+                    onSelect = onSpeechEngineChange,
+                    modifier = Modifier.fillMaxWidth(),
+                )
+            }
         }
     }
 }

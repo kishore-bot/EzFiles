@@ -15,6 +15,6 @@ actual class SpeechRecognition(private val onResult: (SpeechResult) -> Unit) {
 }
 
 @Composable
-actual fun rememberSpeechRecognition(hints: () -> List<String>, onResult: (SpeechResult) -> Unit): SpeechRecognition {
+actual fun rememberSpeechRecognition(hints: () -> List<String>, engine: SpeechEngine, onResult: (SpeechResult) -> Unit): SpeechRecognition {
     return remember { SpeechRecognition(onResult) }
 }

@@ -6,6 +6,8 @@ enum class SpeechState { Idle, Listening, Error }
 
 expect class SpeechRecognition {
     val state: StateFlow<SpeechState>
+    /** How loud the user is speaking, 0..1, while listening; drives the orb. */
+    val level: StateFlow<Float>
     fun start()
     fun stop()
     fun cancel()

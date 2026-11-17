@@ -20,6 +20,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.background
 import androidx.compose.foundation.shape.CircleShape
 import com.ezfiles.reader.platform.SpeechState
+import com.ezfiles.reader.presentation.theme.LocalReducedMotion
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.statusBars
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -110,6 +111,7 @@ fun VoiceAssistantSheet(
         }
     }
     val speechState by speech.state.collectAsState()
+    val speechLevel = speech.level.collectAsState()
 
     LaunchedEffect(ttsState) {
         if (ttsState != TtsState.Speaking && assistantState == AssistantState.Speaking) {
@@ -170,40 +172,6 @@ fun VoiceAssistantSheet(
         }
     }
 
-    // --- Animations ---
-    val infinite = rememberInfiniteTransition()
-
-    // Hue rotation for holographic effect
-    val hueShift by infinite.animateFloat(
-        initialValue = 0f,
-        targetValue = 360f,
-        animationSpec = infiniteRepeatable(tween(4000, easing = LinearEasing), RepeatMode.Restart),
-    )
-
-    // Organic wobble
-    val wobble1 by infinite.animateFloat(
-        initialValue = 0f,
-        targetValue = 2f * PI.toFloat(),
-        animationSpec = infiniteRepeatable(tween(2400, easing = LinearEasing), RepeatMode.Restart),
-    )
-    val wobble2 by infinite.animateFloat(
-        initialValue = 0f,
-        targetValue = 2f * PI.toFloat(),
-        animationSpec = infiniteRepeatable(tween(3200, easing = LinearEasing), RepeatMode.Restart),
-    )
-
-    // Bounce scale — springy when listening
-    val bounceTarget = when (assistantState) {
-        AssistantState.Idle -> 0.6f
-        AssistantState.Listening -> 1.0f + 0.12f * sin(wobble1)
-        AssistantState.Processing -> 0.75f + 0.05f * sin(wobble1 * 2f)
-        AssistantState.Speaking -> 0.95f + 0.08f * sin(wobble1 * 1.5f)
-    }
-    val orbScale by animateFloatAsState(
-        bounceTarget,
-        spring(dampingRatio = Spring.DampingRatioMediumBouncy, stiffness = Spring.StiffnessLow),
-    )
-
     fun toggleState() {
         when (assistantState) {
             AssistantState.Idle -> {
@@ -223,12 +191,6 @@ fun VoiceAssistantSheet(
             }
             AssistantState.Processing -> {}
         }
-    }
-
-    // Holographic colors based on hue shift
-    fun holoColor(offset: Float, alpha: Float = 0.8f): Color {
-        val h = (hueShift + offset) % 360f
-        return hsvToColor(h, 0.6f, 1f, alpha)
     }
 
     // Floating overlay — no background, no sheet, just the orb
@@ -281,99 +243,14 @@ fun VoiceAssistantSheet(
             }
         }
 
-        // The orb
-        val orbSize = 120.dp
-        Canvas(
-            Modifier
-                .size(orbSize)
-                .padding(bottom = 48.dp)
-                .align(Alignment.BottomCenter)
-                .clickable(
-                    indication = null,
-                    interactionSource = remember { MutableInteractionSource() },
-                ) { if (modelState == ModelState.Ready) toggleState() },
-        ) {
-            val center = Offset(size.width / 2, size.height / 2)
-            val baseRadius = (size.minDimension / 2) * orbScale
-
-            // Outer holographic glow layers
-            for (i in 5 downTo 1) {
-                val glowRadius = baseRadius + i * 14f
-                val c = holoColor(i * 60f, alpha = 0.04f * (6 - i))
-                drawCircle(color = c, radius = glowRadius, center = center)
-            }
-
-            // Main orb — radial gradient with shifting holographic colors
-            val color1 = holoColor(0f, 0.9f)
-            val color2 = holoColor(120f, 0.7f)
-            val color3 = holoColor(240f, 0.4f)
-            drawCircle(
-                brush = Brush.radialGradient(
-                    colors = listOf(Color.White.copy(alpha = 0.6f), color1, color2, color3, Color.Transparent),
-                    center = center,
-                    radius = baseRadius * 1.1f,
-                ),
-                radius = baseRadius,
-                center = center,
-            )
-
-            // Inner bright core
-            drawCircle(
-                brush = Brush.radialGradient(
-                    colors = listOf(Color.White.copy(alpha = 0.7f), Color.White.copy(alpha = 0.1f), Color.Transparent),
-                    center = Offset(center.x + baseRadius * 0.1f * cos(wobble2), center.y - baseRadius * 0.15f * sin(wobble1)),
-                    radius = baseRadius * 0.55f,
-                ),
-                radius = baseRadius * 0.55f,
-                center = Offset(center.x + baseRadius * 0.1f * cos(wobble2), center.y - baseRadius * 0.15f * sin(wobble1)),
-            )
-
-            // Swirling highlight arc
-            val arcAngle = Math.toDegrees(wobble1.toDouble()).toFloat()
-            drawArc(
-                brush = Brush.sweepGradient(
-                    colors = listOf(
-                        holoColor(0f, 0.5f),
-                        holoColor(90f, 0.3f),
-                        holoColor(180f, 0.5f),
-                        holoColor(270f, 0.3f),
-                        holoColor(360f, 0.5f),
-                    ),
-                    center = center,
-                ),
-                startAngle = arcAngle,
-                sweepAngle = 160f,
-                useCenter = false,
-                style = Stroke(width = 2.5.dp.toPx()),
-                topLeft = Offset(center.x - baseRadius, center.y - baseRadius),
-                size = androidx.compose.ui.geometry.Size(baseRadius * 2, baseRadius * 2),
-            )
-
-            // Processing: spinning ring
-            if (assistantState == AssistantState.Processing) {
-                val spinAngle = Math.toDegrees((wobble1 * 3f).toDouble()).toFloat()
-                drawArc(
-                    color = Color.White.copy(alpha = 0.6f),
-                    startAngle = spinAngle,
-                    sweepAngle = 90f,
-                    useCenter = false,
-                    style = Stroke(width = 2.dp.toPx()),
-                    topLeft = Offset(center.x - baseRadius - 8f, center.y - baseRadius - 8f),
-                    size = androidx.compose.ui.geometry.Size((baseRadius + 8f) * 2, (baseRadius + 8f) * 2),
-                )
-            }
-
-            // Speaking: expanding ripple rings
-            if (assistantState == AssistantState.Speaking) {
-                val t = (wobble1 / (2f * PI.toFloat()))
-                for (i in 0..2) {
-                    val phase = (t + i * 0.33f) % 1f
-                    val r = baseRadius + phase * 35f
-                    val c = holoColor(phase * 120f, 0.3f * (1f - phase))
-                    drawCircle(color = c, radius = r, center = center, style = Stroke(width = 1.5.dp.toPx()))
-                }
-            }
-        }
+        // The hologram, above the bottom bar; only the orb itself takes taps.
+        HologramOrb(
+            state = assistantState,
+            level = speechLevel,
+            reducedMotion = LocalReducedMotion.current,
+            onTap = { if (modelState == ModelState.Ready) toggleState() },
+            modifier = Modifier.align(Alignment.BottomCenter).padding(bottom = HOLOGRAM_BOTTOM),
+        )
 
         // Always says what Fily is doing, so "is it loaded? is it listening?" never needs a guess.
         val (status, dot) = when {
@@ -388,7 +265,7 @@ fun VoiceAssistantSheet(
         Row(
             Modifier
                 .align(Alignment.BottomCenter)
-                .padding(bottom = 8.dp)
+                .padding(bottom = HOLOGRAM_BOTTOM + 12.dp)
                 .glassPanel(RoundedCornerShape(50))
                 .padding(horizontal = 14.dp, vertical = 6.dp),
             verticalAlignment = Alignment.CenterVertically,
@@ -402,7 +279,7 @@ fun VoiceAssistantSheet(
             EzIcons.Close,
             "Close Fily",
             onDismiss,
-            modifier = Modifier.align(Alignment.BottomEnd).padding(end = 24.dp, bottom = 72.dp),
+            modifier = Modifier.align(Alignment.BottomEnd).padding(end = 20.dp, bottom = HOLOGRAM_BOTTOM + 180.dp),
         )
     }
 }
@@ -412,18 +289,5 @@ private const val SPEECH_START_TIMEOUT_MS = 2_500L
 /** About a minute of silence (each silent session lasts ~5-8 s) before Fily pauses. */
 private const val MAX_QUIET_RESTARTS = 8
 
-// HSV to Compose Color
-private fun hsvToColor(h: Float, s: Float, v: Float, alpha: Float): Color {
-    val c = v * s
-    val x = c * (1f - kotlin.math.abs((h / 60f) % 2f - 1f))
-    val m = v - c
-    val (r, g, b) = when {
-        h < 60f -> Triple(c, x, 0f)
-        h < 120f -> Triple(x, c, 0f)
-        h < 180f -> Triple(0f, c, x)
-        h < 240f -> Triple(0f, x, c)
-        h < 300f -> Triple(x, 0f, c)
-        else -> Triple(c, 0f, x)
-    }
-    return Color(r + m, g + m, b + m, alpha)
-}
+/** Clears the library's bottom bar. */
+private val HOLOGRAM_BOTTOM = 76.dp

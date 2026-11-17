@@ -430,6 +430,7 @@ private fun AppearanceCard(
                 checked = contentEnabled,
                 onCheckedChange = onContentChange,
             )
+            com.ezfiles.reader.presentation.assistant.ModelInstallRow(com.ezfiles.reader.application.assistant.AssistantModel.Fily)
             if (speechEngine != null) {
                 Text("Speech recognition", style = MaterialTheme.typography.bodyLarge, color = EzColors.Text)
                 Text(
@@ -445,6 +446,9 @@ private fun AppearanceCard(
                     onSelect = onSpeechEngineChange,
                     modifier = Modifier.fillMaxWidth(),
                 )
+                if (speechEngine == SpeechEngine.Moonshine) {
+                    com.ezfiles.reader.presentation.assistant.ModelInstallRow(com.ezfiles.reader.application.assistant.AssistantModel.Moonshine)
+                }
             }
         }
     }

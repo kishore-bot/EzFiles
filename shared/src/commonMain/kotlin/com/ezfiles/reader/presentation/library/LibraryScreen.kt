@@ -213,7 +213,8 @@ fun LibraryScreen(
                 Header(onOpenAbout, onVoice = onVoice, compact = landscape)
             }
             item(key = "search", contentType = "search") {
-                SearchField(searchInput, onQueryChange, Modifier.padding(horizontal = EzSpacing.Gutter, vertical = 4.dp), compact = landscape)
+                SearchField(searchInput, onQueryChange, Modifier.padding(horizontal = EzSpacing.Gutter, vertical = 4.dp), compact = landscape,
+                    onVoice = onVoice.takeIf { landscape })
             }
             if (shareSelection.isNotEmpty()) item(key = "share-selection", contentType = "actions") {
                 Row(Modifier.fillMaxWidth().padding(horizontal = EzSpacing.Gutter), verticalAlignment = Alignment.CenterVertically) {
@@ -565,7 +566,14 @@ private fun Header(onOpenAbout: (() -> Unit)?, onVoice: (() -> Unit)? = null, co
 }
 
 @Composable
-private fun SearchField(query: String, onQueryChange: (String) -> Unit, modifier: Modifier = Modifier, compact: Boolean = false) {
+private fun SearchField(
+    query: String,
+    onQueryChange: (String) -> Unit,
+    modifier: Modifier = Modifier,
+    compact: Boolean = false,
+    /** Landscape has no header row, so Fily's mic sits at the end of the search row. */
+    onVoice: (() -> Unit)? = null,
+) {
     Row(modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(16.dp)) {
         if (compact) Text(
             "EzFiles",
@@ -596,6 +604,7 @@ private fun SearchField(query: String, onQueryChange: (String) -> Unit, modifier
                 BarIconButton(EzIcons.Close, "Clear search", { onQueryChange("") }, tint = EzColors.TextSecondary)
             }
         }
+        if (compact && onVoice != null) GlassIconButton(EzIcons.Mic, "Voice assistant", onVoice)
     }
 }
 

@@ -421,3 +421,11 @@ actual fun rememberMediaFilePicker(onResult: (DocumentRef?) -> Unit): DocumentPi
     }
     return remember(launcher) { DocumentPicker { launcher.launch(arrayOf("audio/*", "video/*")) } }
 }
+
+@Composable
+actual fun rememberModelFilePicker(onResult: (List<String>) -> Unit): () -> Unit {
+    val launcher = rememberLauncherForActivityResult(ActivityResultContracts.OpenMultipleDocuments()) { uris ->
+        onResult(uris.map(Uri::toString))
+    }
+    return remember(launcher) { { launcher.launch(arrayOf("*/*")) } }
+}

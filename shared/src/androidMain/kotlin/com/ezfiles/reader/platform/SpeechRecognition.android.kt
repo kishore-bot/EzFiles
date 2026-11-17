@@ -49,7 +49,7 @@ actual class SpeechRecognition(
         cancel()
         if (engine == SpeechEngine.Moonshine) {
             if (MoonshineSpeech.available()) return startMoonshine()
-            Log.w(TAG, "Moonshine files missing in ${MoonshineSpeech.MODEL_DIR}; using the Android recognizer")
+            Log.w(TAG, "Moonshine model not installed; using the Android recognizer")
         }
         val local = onDevice
         if (!local && !SpeechRecognizer.isRecognitionAvailable(context)) {

@@ -23,25 +23,28 @@ import kotlin.math.sqrt
  * starts and stops speaking; the whole utterance is then transcribed at once (Moonshine is not a
  * streaming model). Loaded on first use and kept for the process: loading takes about a second.
  *
- * Model files, like Fily's GGUF for now, live in [MODEL_DIR]:
+ * Model files (downloaded in EzFiles Info, or pushed with adb) are found through [folder]:
  * `encoder_model.ort`, `decoder_model_merged.ort`, `tokens.txt` (sherpa-onnx-moonshine-base-en-quantized)
  * and `silero_vad.onnx`.
  */
 internal object MoonshineSpeech {
-    const val MODEL_DIR = "/data/local/tmp/moonshine-base-en"
+    /** Where the installed model is, or null; set by the app (AndroidModelDownloads). */
+    var folder: () -> String? = { null }
     private const val TAG = "EzSpeech"
     private const val SAMPLE_RATE = 16_000
     private const val WINDOW = 512
 
-    private val files = listOf("encoder_model.ort", "decoder_model_merged.ort", "tokens.txt", "silero_vad.onnx").map { File(MODEL_DIR, it) }
+    private val names = listOf("encoder_model.ort", "decoder_model_merged.ort", "tokens.txt", "silero_vad.onnx")
+    private val files: List<File> get() = folder()?.let { dir -> names.map { File(dir, it) } }.orEmpty()
 
-    fun available(): Boolean = files.all { it.isFile && it.canRead() }
+    fun available(): Boolean = files.isNotEmpty() && files.all { it.isFile && it.canRead() }
 
     private var recognizer: OfflineRecognizer? = null
     private var vad: Vad? = null
 
     @Synchronized
     private fun load(): Pair<OfflineRecognizer, Vad> {
+        val files = files
         val r = recognizer ?: OfflineRecognizer(
             null,
             OfflineRecognizerConfig(

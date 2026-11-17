@@ -124,3 +124,7 @@ private fun topViewController(): UIViewController? {
     }
     return controller
 }
+
+/** iOS is parked: no model import yet. */
+@androidx.compose.runtime.Composable
+actual fun rememberModelFilePicker(onResult: (List<String>) -> Unit): () -> Unit = { onResult(emptyList()) }

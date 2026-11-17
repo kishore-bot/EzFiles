@@ -25,6 +25,8 @@ actual class SpeechRecognition(
 ) {
     private val _state = MutableStateFlow(SpeechState.Idle)
     actual val state: StateFlow<SpeechState> = _state
+    private val _level = MutableStateFlow(0f)
+    actual val level: StateFlow<Float> = _level
 
     private var recognizer: SpeechRecognizer? = null
 
@@ -47,9 +49,10 @@ actual class SpeechRecognition(
         sr.setRecognitionListener(object : RecognitionListener {
             override fun onReadyForSpeech(params: Bundle?) { _state.value = SpeechState.Listening }
             override fun onBeginningOfSpeech() {}
-            override fun onRmsChanged(rmsdB: Float) {}
+            // Roughly -2 dB (silence) to 10 dB (speech) on phones.
+            override fun onRmsChanged(rmsdB: Float) { _level.value = ((rmsdB + 2f) / 12f).coerceIn(0f, 1f) }
             override fun onBufferReceived(buffer: ByteArray?) {}
-            override fun onEndOfSpeech() {}
+            override fun onEndOfSpeech() { _level.value = 0f }
             override fun onError(error: Int) {
                 Log.w(TAG, "Recognition error $error (on-device=$local)")
                 _state.value = SpeechState.Error

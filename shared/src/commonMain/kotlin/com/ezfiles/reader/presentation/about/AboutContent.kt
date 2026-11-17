@@ -121,6 +121,16 @@ val Licences: List<Licence> = listOf(
     Licence("RustCrypto aes, cbc, sha1, sha2, md-5 and rc4", "MIT or Apache License 2.0"),
     Licence("getrandom and zeroize", "MIT or Apache License 2.0"),
     Licence("Carlito, Caladea, Arimo, Tinos and Cousine fonts", "SIL Open Font License 1.1"),
+    Licence("AndroidX Media3 (ExoPlayer and its FFmpeg extension bridge)", "Apache License 2.0"),
+    Licence(
+        "FFmpeg 7.1.2 audio decoders (libavcodec, libavutil, libswresample), built unmodified as separate shared libraries " +
+            "that can be replaced; source: ffmpeg.org/releases/ffmpeg-7.1.2.tar.xz, build script: scripts/build-ffmpeg.sh",
+        "GNU Lesser General Public License 2.1 or later",
+    ),
+    Licence("llama.cpp and ggml (on-device assistant engine)", "MIT License"),
+    Licence("Fily model, fine-tuned from Liquid AI LFM2.5-350M", "LFM Open License 1.0"),
+    Licence("sherpa-onnx and ONNX Runtime (Moonshine speech engine)", "Apache License 2.0 and MIT License"),
+    Licence("Moonshine speech model and Silero VAD", "MIT License"),
     Licence("Google ML Kit Text Recognition (on-device model)", "ML Kit Terms of Service (not open source)"),
     Licence("Firebase Crashlytics (optional Android diagnostics build)", "Apache License 2.0; Firebase service terms apply"),
 )

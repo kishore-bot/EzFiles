@@ -22,7 +22,7 @@ import java.util.concurrent.atomic.AtomicBoolean
  */
 object FilyBench {
     private const val TAG = "EzBench"
-    private val requests = listOf("find my latest CV", "open it", "what does it say about the payment", "show my recent files")
+    private val defaultRequests = listOf("find my latest CV", "open it", "what does it say about the payment", "show my recent files")
     private val running = AtomicBoolean(false)
 
     /** [spec]: "model=/data/local/tmp/X.gguf;gpu=0;threads=4;ubatch=512;runs=5;label=q8-cpu". */
@@ -50,6 +50,8 @@ object FilyBench {
         val ubatch = options["ubatch"]?.toInt() ?: 512
         val runs = options["runs"]?.toInt() ?: 5
         val label = options["label"] ?: model.substringAfterLast('/')
+        // asks=first request|second request: a custom conversation instead of the standard four.
+        val requests = options["asks"]?.split('|')?.map(String::trim)?.filter(String::isNotEmpty) ?: defaultRequests
         // Two copies of the model would not fit comfortably next to each other.
         dependencies.modelManager?.unload()
 
@@ -59,12 +61,14 @@ object FilyBench {
         val loadMs = SystemClock.elapsedRealtime() - loadStart
         Log.i(TAG, "LOAD label=$label ms=$loadMs gpuFailed=${inference.gpuFailed()}")
 
+        val navigation = AssistantNavigation()
         val session = FilySession(
             complete = { prompt, grammar -> inference.infer(prompt, 128, FilyPrompt.STABLE_PREFIX, grammar) },
-            tools = ToolExecutor(dependencies.assistantActions, AssistantNavigation()),
+            tools = ToolExecutor(dependencies.assistantActions, navigation),
             access = dependencies.assistantAccess,
             today = { java.time.LocalDate.now().toString() },
             reader = ReaderControl(),
+            log = { Log.i("EzFily", it) },
         )
         val times = List(requests.size) { ArrayList<Long>() }
         repeat(runs) { run ->
@@ -72,6 +76,13 @@ object FilyBench {
             requests.forEachIndexed { index, request ->
                 val start = SystemClock.elapsedRealtime()
                 val reply = session.ask(request)
+                // As on screen: a file Fily opened is the open file for the next request.
+                navigation.pending.value?.let { destination ->
+                    if (destination.action == com.ezfiles.reader.application.assistant.AssistantAction.Open) {
+                        destination.ref?.let { session.openDocumentId = dependencies.assistantActions.documentId(it) }
+                    }
+                    navigation.consume(destination)
+                }
                 val ms = SystemClock.elapsedRealtime() - start
                 times[index] += ms
                 Log.i(TAG, "RUN label=$label run=${run + 1} ms=$ms request=\"$request\" reply=\"${reply.take(80)}\"")

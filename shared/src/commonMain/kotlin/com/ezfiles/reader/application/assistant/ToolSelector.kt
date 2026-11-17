@@ -37,11 +37,18 @@ internal object ToolSelector {
         """\b(how big|size|when (was|did)|modified|details|info)\b""" to listOf("getDocumentInfo"),
     ).map { (pattern, tools) -> Regex(pattern) to tools }
 
+    /** With a file open, only these words send a question to the library instead of to that file. */
+    private val elsewhere = Regex("""\b(find|search|look for|another|other|open|latest|newest|oldest|recent|recently|library|files)\b""")
+    private val libraryTools = setOf("searchLibrary", "openDocument", "listRecentDocuments")
+
     fun select(request: String, screen: FilyScreen, available: Set<String>): List<String> {
         val text = request.lowercase()
+        // "Which is my current company?" with the CV open is about the CV, not a library search.
+        val aboutOpenFile = screen.selectedDocumentId != null && !elsewhere.containsMatchIn(text)
         val matched = rules.filter { (regex, _) -> regex.containsMatchIn(text) }.flatMap { it.second }
+            .filter { !aboutOpenFile || it !in libraryTools }
         val base = if (screen.selectedDocumentId != null) {
-            listOf("getDocumentExcerpt", "findTextInDocument", "searchLibrary")
+            listOf("getDocumentExcerpt", "findTextInDocument") + if (aboutOpenFile) emptyList() else listOf("searchLibrary")
         } else {
             listOf("searchLibrary", "openDocument", "listRecentDocuments")
         }

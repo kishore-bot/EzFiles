@@ -53,6 +53,35 @@ class PassagesTest {
     }
 
     @Test
+    fun aCvQuestionFindsTheCurrentJobNotTheProjectsHeading() {
+        val pages = listOf(
+            "KISHORE K AI Backend Engineer kishore@example.com Summary: backend systems and on-device AI.",
+            "Software Engineer, Nimbus Labs Pvt Ltd (2024 - Present) building payment APIs in Python. " +
+                "Intern, Aster Works (2023 - 2024) testing Android apps.",
+            "OBSERVABILITY Prometheus, Sentry MOBILE Android, Jetpack Compose " + "Selected Projects & Engineering Experience ".repeat(2) +
+                "Donkey: multiplayer card game backend with websockets and matchmaking. ".repeat(6),
+        )
+        val starts = pages.runningFold(0) { at, page -> at + page.length + 1 }.dropLast(1)
+        val text = pages.joinToString("\n")
+        val (experience, _) = Passages.select(text, "what is my current experience in this CV", 700, starts)
+        assertTrue("Nimbus Labs" in experience && "Present" in experience, experience)
+        assertTrue(experience.startsWith("[page 1] KISHORE K"), experience)
+        val (company, _) = Passages.select(text, "which is my current company", 700, starts)
+        assertTrue("Nimbus Labs" in company, company)
+        // Passages never start or end inside a word.
+        assertTrue(Regex("""\b[A-Z]{3,}\b""").findAll(experience).none { it.value == "BSERVABILITY" })
+    }
+
+    @Test
+    fun aQuestionWithAFileOpenIsAboutThatFile() {
+        val open = FilyScreen("doc_1")
+        val tools = ToolSelector.select("which is my current company", open, FilyPrompt.toolNames.toSet())
+        assertFalse("searchLibrary" in tools, tools.toString())
+        assertTrue("getDocumentExcerpt" in tools)
+        assertTrue("searchLibrary" in ToolSelector.select("find my other resume", open, FilyPrompt.toolNames.toSet()))
+    }
+
+    @Test
     fun grammarOffersOnlyTheGivenTools() {
         val grammar = FilyGrammar.forTools(listOf("openDocument"))
         assertTrue("""name ::= "\"openDocument\""""" in grammar)

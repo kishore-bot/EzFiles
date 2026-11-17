@@ -22,6 +22,36 @@ internal object Passages {
     )
     private val pageRequest = Regex("""\bpage (\w+)\b""")
 
+    /**
+     * Words a question uses for what documents say differently ("my experience" vs "engineer at X,
+     * 2023-present"). Related words count at [RELATED_WEIGHT] of the user's own words.
+     */
+    private val related = mapOf(
+        "experience" to listOf("work", "worked", "role", "company", "engineer", "developer", "intern", "present", "year", "employment", "job"),
+        "company" to listOf("work", "worked", "employer", "present", "current", "ltd", "inc", "pvt", "technologies", "engineer", "role"),
+        "work" to listOf("experience", "company", "role", "present", "job", "engineer", "developer"),
+        "job" to listOf("experience", "role", "company", "present", "position"),
+        "current" to listOf("present", "now", "currently", "today"),
+        "skill" to listOf("technologies", "tools", "stack", "languages", "framework", "proficient"),
+        "education" to listOf("degree", "university", "college", "school", "btech", "bachelor", "master", "graduated"),
+        "study" to listOf("degree", "university", "college", "education", "bachelor", "master"),
+        "college" to listOf("university", "degree", "education", "institute"),
+        "contact" to listOf("email", "phone", "mobile", "linkedin", "address"),
+        "phone" to listOf("mobile", "contact", "tel"),
+        "salary" to listOf("ctc", "pay", "compensation", "payment", "amount"),
+        "payment" to listOf("fee", "amount", "total", "inr", "price", "paid", "pay", "instalment"),
+        "cost" to listOf("fee", "amount", "total", "inr", "price"),
+        "pay" to listOf("payment", "fee", "amount", "total", "due"),
+        "due" to listOf("deadline", "date", "before", "within"),
+        "deadline" to listOf("due", "date", "before", "within"),
+        "terminate" to listOf("termination", "notice", "cancel", "end"),
+        "end" to listOf("termination", "notice", "expire", "until"),
+        "project" to listOf("built", "developed", "implemented", "designed"),
+    )
+    private const val RELATED_WEIGHT = 0.5
+    /** The document's opening (who or what it is) is always offered when it fits in this many characters. */
+    private const val OPENING_CHARS = 300
+
     private class Chunk(val text: String, val page: Int?)
 
     /**
@@ -31,16 +61,19 @@ internal object Passages {
      */
     fun select(text: String, question: String, budget: Int, pageStarts: List<Int> = emptyList()): Pair<String, Boolean> {
         pageText(text, pageStarts, question, budget)?.let { return it }
-        val terms = terms(question)
-        if (text.length <= budget || terms.isEmpty()) return start(text, pageStarts, budget)
+        val own = terms(question)
+        if (text.length <= budget || own.isEmpty()) return start(text, pageStarts, budget)
+        val weights = HashMap<String, Double>()
+        for (term in own) for (word in related[term].orEmpty()) weights[stem(word)] = RELATED_WEIGHT
+        for (term in own) weights[term] = 1.0
         val chunks = chunks(text, pageStarts)
         val words = chunks.map { chunk -> words(chunk.text).map(::stem) }
-        val documentFrequency = terms.associateWith { term -> words.count { term in it } }
+        val documentFrequency = weights.keys.associateWith { term -> words.count { term in it } }
         val scores = words.map { chunkWords ->
-            terms.sumOf { term ->
+            weights.entries.sumOf { (term, weight) ->
                 val frequency = chunkWords.count { it == term }
                 if (frequency == 0) 0.0
-                else ln(1.0 + chunks.size.toDouble() / documentFrequency.getValue(term)) * frequency / (frequency + 1.2)
+                else weight * ln(1.0 + chunks.size.toDouble() / documentFrequency.getValue(term)) * frequency / (frequency + 1.2)
             }
         }
         val ranked = chunks.indices.filter { scores[it] > 0.0 }.sortedByDescending { scores[it] }
@@ -53,7 +86,14 @@ internal object Passages {
             chosen += index
             used += cost
         }
-        if (chosen.isEmpty()) chosen += ranked.first()
+        if (chosen.isEmpty()) {
+            chosen += ranked.first()
+            used = budget
+        }
+        // Then the opening, if it still fits: it says whose or what document this is (name, current
+        // role, parties, invoice number). The answers come first.
+        val opening = labelled(chunks.first())
+        if (0 !in chosen && opening.length <= OPENING_CHARS && used + opening.length + SEPARATOR.length <= budget) chosen += 0
         return chosen.sorted().joinToString(SEPARATOR) { labelled(chunks[it]) }.take(budget) to true
     }
 
@@ -106,7 +146,7 @@ internal object Passages {
         val pieces = text.split(Regex("\\n\\s*\\n|\\r?\\n")).map(String::trim).filter(String::isNotEmpty)
             .flatMap { paragraph ->
                 if (paragraph.length <= CHUNK_CHARS) listOf(paragraph)
-                else paragraph.split(Regex("(?<=[.!?])\\s+")).flatMap { it.chunked(CHUNK_CHARS) }
+                else paragraph.split(Regex("(?<=[.!?])\\s+")).flatMap(::wordChunks)
             }
         val chunks = ArrayList<String>()
         val current = StringBuilder()
@@ -120,5 +160,22 @@ internal object Passages {
         }
         if (current.isNotEmpty()) chunks += current.toString()
         return chunks
+    }
+
+    /** A long sentence (PDF text often has no full stops) split between words, never inside one. */
+    private fun wordChunks(sentence: String): List<String> {
+        if (sentence.length <= CHUNK_CHARS) return listOf(sentence)
+        val out = ArrayList<String>()
+        val current = StringBuilder()
+        for (word in sentence.split(' ')) {
+            if (current.isNotEmpty() && current.length + word.length + 1 > CHUNK_CHARS) {
+                out += current.toString()
+                current.clear()
+            }
+            if (current.isNotEmpty()) current.append(' ')
+            current.append(word.take(CHUNK_CHARS))
+        }
+        if (current.isNotEmpty()) out += current.toString()
+        return out
     }
 }

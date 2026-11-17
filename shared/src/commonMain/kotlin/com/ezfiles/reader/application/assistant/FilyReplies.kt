@@ -65,6 +65,8 @@ internal object FilyReplies {
         if (docs.isEmpty()) return AfterTool.Say("I couldn't find a matching file.")
         val latest = tool == "listRecentDocuments" || args.string("sort") in latestSorts
         if (wantsOpen && (docs.size == 1 || latest)) return AfterTool.Open(docs.first().documentId)
+        // "open my styled resume": the one result whose name has a word only it has.
+        if (wantsOpen) namedIn(text, docs)?.let { return AfterTool.Open(it.documentId) }
         val shown = docs.take(3)
         val names = shown.map { spoken(it.name) }
         val list = when (names.size) {
@@ -81,6 +83,24 @@ internal object FilyReplies {
         }
     }
 
+    private val ignored = setOf("open", "the", "my", "file", "document", "please", "show", "view", "play", "launch", "start", "fily", "one",
+        "pdf", "and", "for", "with", "that", "this",
+        // What kind of file, not which one: "open my resume" must not prefer old-resume.pdf over Kishore_CV.pdf.
+        "resume", "resumes", "cv", "cvs", "invoice", "invoices", "bill", "bills", "contract", "contracts", "agreement", "receipt",
+        "receipts", "notes", "note", "report", "reports", "statement", "photo", "photos", "video", "videos", "latest", "newest")
+
+    /** The single result whose name contains more of the request's words than any other. */
+    private fun namedIn(request: String, docs: List<ListedFile>): ListedFile? {
+        val words = request.split(Regex("[^a-z0-9]+")).filter { it.length >= 3 && it !in ignored }.toSet()
+        if (words.isEmpty()) return null
+        val scored = docs.map { doc ->
+            val name = doc.name.lowercase().split(Regex("[^a-z0-9]+")).toSet()
+            doc to words.count { it in name }
+        }.sortedByDescending { it.second }
+        val (best, score) = scored.first()
+        return best.takeIf { score > 0 && scored.getOrNull(1)?.second != score }
+    }
+
     private fun count(n: Int, more: Boolean) = if (more) "at least $n files" else "$n files"
 
     private fun failure(tool: String, args: JsonObject?, reason: String?): String? = when (reason) {
@@ -95,7 +115,8 @@ internal object FilyReplies {
             "select_cell", "next_sheet", "previous_sheet" -> "This isn't a spreadsheet."
             else -> "I can't do that in this file."
         }
-        "unsupported_tool", "missing_arguments", null -> null
+        "missing_arguments" -> "Which file do you mean?"
+        "unsupported_tool", null -> null
         else -> if (tool == "controlReader") {
             QuickCommands.reply(QuickCommand(args.string("operation") ?: "", args.string("value")), null, null, null, null, reason)
         } else null

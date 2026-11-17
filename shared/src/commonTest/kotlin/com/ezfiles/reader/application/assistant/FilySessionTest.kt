@@ -170,7 +170,7 @@ class FilySessionTest {
             """{"kind":"reply","text":"I found resume.pdf.","citations":["id-resume.pdf"]}""",
         ))
         val session = FilySession({ prompt, _ -> prompts += prompt; replies.removeFirst() }, f.tools, f.access, today = { "2026-11-16" })
-        assertEquals("I found resume.pdf.", session.ask("find my resume"))
+        assertEquals("I found resume.pdf.", session.ask("what does my resume say"))
         assertTrue(prompts[1].contains("<|im_start|>tool\n{\"documents\":[{\"id\":\"doc_1\",\"name\":\"resume.pdf\"}],\"partial\":false}<|im_end|>"))
         assertTrue(prompts[1].contains("<|im_start|>assistant\n{\"kind\":\"tool\",\"name\":\"searchLibrary\""))
     }
@@ -182,10 +182,10 @@ class FilySessionTest {
         session.listedFiles = { listOf(ListedFile("id-notes.txt", "notes.txt"), ListedFile("id-resume.pdf", "resume.pdf")) }
         assertEquals("open the first file you see on screen",
             session.bestTranscript(listOf("open the first five UC", "open the first file you see on screen")))
-        assertEquals("Opening notes.txt.", session.ask("open the first file UC on screen"))
+        assertEquals("Opening notes.", session.ask("open the first file UC on screen"))
         assertEquals("notes.txt", f.navigation.pending.value?.ref?.displayName)
-        assertEquals("Opening resume.pdf.", session.ask("open the second one"))
-        assertEquals("Opening resume.pdf.", session.ask("open the last file"))
+        assertEquals("Opening resume.", session.ask("open the second one"))
+        assertEquals("Opening resume.", session.ask("open the last file"))
         assertEquals("There are only 2 files on screen.", session.ask("open the fifth file"))
     }
 
@@ -246,6 +246,31 @@ class FilySessionTest {
         assertEquals(null, QuickCommands.listPosition("open invoice number 3"))
         assertEquals(null, QuickCommands.listPosition("open the first contract about payments"))
         assertEquals(null, QuickCommands.listPosition("find my latest CV"))
+    }
+
+    @Test
+    fun actionResultsGetFixedRepliesWithoutASecondModelCall() = runTest {
+        val f = FilyFixture(listOf(doc("Kishore_CV.pdf", 5L), doc("old-resume.pdf", 1L), doc("notes.txt", 9L)))
+        var calls = 0
+        fun session(vararg replies: String): FilySession {
+            val queue = ArrayDeque(replies.toList())
+            return FilySession({ _, _ -> calls++; queue.removeFirst() }, f.tools, f.access, today = { "2026-11-17" })
+        }
+        // "open my latest CV": search, then the newest result opens with no second model call.
+        val open = session("""{"kind":"tool","name":"searchLibrary","arguments":{"query":"","category":"resume","sort":"modified_desc"}}""")
+        assertEquals("Opening Kishore CV.", open.ask("open my latest CV"))
+        assertEquals("Kishore_CV.pdf", f.navigation.pending.value?.ref?.displayName)
+        assertEquals(1, calls)
+        // A plain find lists; "Which one?" answers by position.
+        val find = session("""{"kind":"tool","name":"searchLibrary","arguments":{"query":"","category":"resume","sort":"relevance"}}""")
+        assertEquals("I found 2 files. The top ones are Kishore CV and old resume.", find.ask("find my resumes"))
+        val pick = session("""{"kind":"tool","name":"searchLibrary","arguments":{"query":"","category":"resume","sort":"relevance"}}""")
+        assertEquals("I found 2 files: Kishore CV or old resume. Which one?", pick.ask("open my resume"))
+        assertEquals("Opening old resume.", pick.ask("the second one"))
+        // A failed page command is explained accurately, not by the model.
+        val failed = FilyReplies.afterTool("controlReader", json("""{"operation":"go_to_page","value":1}"""),
+            json("""{"status":"failed","reason":"unsupported_here"}"""), "go to page 1") { null }
+        assertEquals(AfterTool.Say("This file has no pages. Say scroll down instead."), failed)
     }
 
     @Test

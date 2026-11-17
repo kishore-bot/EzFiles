@@ -1,5 +1,9 @@
 package com.ezfiles.reader.application.assistant
 
+import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonPrimitive
+import kotlinx.serialization.json.jsonObject
+import kotlinx.serialization.json.add
 import kotlinx.serialization.json.buildJsonArray
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
@@ -77,6 +81,11 @@ class FilySession(
             ))
             return "Closed."
         }
+        val justOffered = offered
+        offered = emptyList()
+        if (justOffered.isNotEmpty()) {
+            (QuickCommands.listPosition(request) ?: QuickCommands.choicePosition(request))?.let { return openListed(request, justOffered, it) }
+        }
         if (screen.selectedDocumentId == null) QuickCommands.listPosition(request)?.let { position ->
             val listed = listedFiles()
             if (listed.isNotEmpty()) return openListed(request, listed, position)
@@ -100,9 +109,40 @@ class FilySession(
             val result = if (toolName in toolNames) tools.execute(toolName, response.toolArgs) else UNOFFERED_TOOL
             log("Tool $toolName -> ${result.take(300)}")
             exchange += FilyTurn(FilyRole.Tool, result)
+            // Action results get a fixed, accurate sentence; only content answers go back to the model.
+            val parsed = runCatching { Json.parseToJsonElement(result).jsonObject }.getOrNull()
+            when (val next = parsed?.let { FilyReplies.afterTool(toolName, response.toolArgs, it, request, tools::nameOf) }) {
+                is AfterTool.Say -> return finish(exchange, next)
+                is AfterTool.Open -> {
+                    val args = buildJsonObject { put("documentId", next.documentId) }
+                    exchange += FilyTurn(FilyRole.Assistant, buildJsonObject {
+                        put("kind", "tool"); put("name", "openDocument"); put("arguments", args)
+                    }.toString())
+                    val opened = tools.execute("openDocument", args)
+                    log("Built-in: open result ${next.documentId} -> $opened")
+                    exchange += FilyTurn(FilyRole.Tool, opened)
+                    val say = runCatching { Json.parseToJsonElement(opened).jsonObject }.getOrNull()
+                        ?.let { FilyReplies.afterTool("openDocument", args, it, request, tools::nameOf) } as? AfterTool.Say
+                    return finish(exchange, say ?: AfterTool.Say("I couldn't open it."))
+                }
+                null -> {}
+            }
         }
         error("unreachable")
     }
+
+    private fun finish(exchange: MutableList<FilyTurn>, say: AfterTool.Say): String {
+        exchange += FilyTurn(FilyRole.Assistant, buildJsonObject {
+            put("kind", "reply"); put("text", say.text)
+            put("citations", buildJsonArray { say.citations.forEach { add(JsonPrimitive(it)) } })
+        }.toString())
+        remember(exchange)
+        say.offered?.let { offered = it }
+        return say.text
+    }
+
+    /** The files Fily just listed ("I found 3 files…"): "the second one" picks from these next. */
+    private var offered: List<ListedFile> = emptyList()
 
     fun clear() = history.clear()
 
@@ -181,7 +221,7 @@ class FilySession(
         val result = tools.execute("openDocument", args)
         log("Built-in: open listed #$position -> $result")
         val opened = "\"opened\"" in result
-        val reply = if (opened) "Opening ${file.name}." else "I couldn't open ${file.name}."
+        val reply = if (opened) "Opening ${FilyReplies.spoken(file.name)}." else "I couldn't open ${FilyReplies.spoken(file.name)}."
         val alias = tools.alias(file.documentId)
         remember(listOf(
             FilyTurn(FilyRole.User, request),

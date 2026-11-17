@@ -807,6 +807,7 @@ pub enum NativePdfToolOp {
     Resize { width: f32, height: f32 },
     AddPassword { password: String },
     RemovePassword,
+    PrintCopy,
 }
 
 /// Called on the thread running the tool. Must not throw.
@@ -822,6 +823,7 @@ pub struct NativePdfToolInfo {
     pub encrypted: bool,
     pub is_signed: bool,
     pub archival: bool,
+    pub printable: bool,
 }
 
 /// What the source had that the output couldn't carry.
@@ -845,7 +847,13 @@ pub struct NativePdfToolReport {
 
 impl From<PdfToolInfo> for NativePdfToolInfo {
     fn from(info: PdfToolInfo) -> Self {
-        Self { page_count: info.page_count, encrypted: info.encrypted, is_signed: info.signed, archival: info.archival }
+        Self {
+            page_count: info.page_count,
+            encrypted: info.encrypted,
+            is_signed: info.signed,
+            archival: info.archival,
+            printable: info.printable,
+        }
     }
 }
 
@@ -932,6 +940,7 @@ pub fn pdf_tool_run(
         }
         NativePdfToolOp::AddPassword { password } => PdfToolOp::AddPassword { password: Zeroizing::new(password) },
         NativePdfToolOp::RemovePassword => PdfToolOp::RemovePassword,
+        NativePdfToolOp::PrintCopy => PdfToolOp::PrintCopy,
     };
     let mut observer = ListenerObserver(listener);
     let result = (|| -> Result<PdfToolReport, ReadError> {

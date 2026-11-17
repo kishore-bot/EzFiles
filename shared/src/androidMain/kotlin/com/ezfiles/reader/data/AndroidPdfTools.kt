@@ -44,11 +44,14 @@ internal class AndroidPdfTools(context: Context) : PdfTools {
 
     override suspend fun inspect(source: PdfSource): PdfFileInfo = withContext(Dispatchers.IO) {
         val info = engineCall { pdfToolInspect(native(source)) }
-        PdfFileInfo(info.pageCount.toInt(), info.encrypted, info.isSigned, info.archival)
+        PdfFileInfo(info.pageCount.toInt(), info.encrypted, info.isSigned, info.archival, info.printable)
     }
 
     override suspend fun merge(sources: List<PdfSource>, target: String, onProgress: (Int, Int) -> Unit) =
         rewrite(target, sources.map(::Input), NativePdfToolOp.Merge, onProgress)
+
+    override suspend fun printCopy(source: PdfSource, pageCount: Int, target: String) =
+        rewrite(target, listOf(Input(source)), NativePdfToolOp.PrintCopy, { _, _ -> })
 
     override suspend fun rebuild(source: PdfSource, pages: List<PdfPageEdit>, target: String, onProgress: (Int, Int) -> Unit) =
         rewrite(

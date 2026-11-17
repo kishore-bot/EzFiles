@@ -22,6 +22,8 @@ data class PdfFileInfo(
     val signed: Boolean,
     /** PDF/A: changing it can break archival conformance, so the UI warns first. */
     val archival: Boolean,
+    /** False only when the file forbids printing to someone without the owner password. */
+    val printable: Boolean = true,
 )
 
 /** One page of a rebuilt document: [sourcePage] is zero-based; extra clockwise rotation in multiples of 90. */
@@ -59,6 +61,13 @@ interface PdfTools {
 
     /** Exactly [pages], in that order: this is reorder, rotate, delete, extract and split. A page may appear twice. */
     suspend fun rebuild(source: PdfSource, pages: List<PdfPageEdit>, target: String, onProgress: (Int, Int) -> Unit = { _, _ -> })
+
+    /**
+     * Every page, unprotected, for the print spooler only. Needs just the print permission, so a
+     * watermarked PDF that opens for anyone prints without its owner password.
+     */
+    suspend fun printCopy(source: PdfSource, pageCount: Int, target: String) =
+        rebuild(source, List(pageCount) { PdfPageEdit(it) }, target)
 
     /**
      * Scales the content of every page to fit [size] as displayed, centred and

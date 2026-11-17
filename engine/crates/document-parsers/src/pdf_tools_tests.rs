@@ -819,6 +819,27 @@ fn owner_restrictions_are_honoured_until_the_owner_password_is_given() {
     }
 }
 
+/// A watermarked PDF opens for anyone and forbids changes but allows printing: printing it must
+/// not ask for the owner password (it used to, because print went through Rebuild).
+#[test]
+fn a_print_copy_needs_only_the_print_permission() {
+    for (file_name, bytes) in [("no assemble", NO_ASSEMBLE), ("no modify", NO_MODIFY), ("all allowed", ALL_ALLOWED)] {
+        let info = inspect_for_tools(Cursor::new(bytes.to_vec()), None).unwrap();
+        assert!(info.printable, "{file_name}");
+        let (out, report) = run(&[(bytes, None)], &PdfToolOp::PrintCopy).unwrap();
+        assert!(!out.is_empty(), "{file_name}");
+        assert_eq!(report.page_count, info.page_count, "{file_name}");
+        // The copy is plain: it opens without any password.
+        let copy = inspect_for_tools(Cursor::new(out), None).unwrap();
+        assert!(!copy.encrypted, "{file_name}");
+    }
+    assert!(!inspect_for_tools(Cursor::new(NO_PRINT.to_vec()), None).unwrap().printable);
+    let err = run(&[(NO_PRINT, None)], &PdfToolOp::PrintCopy).unwrap_err();
+    assert_eq!(err.kind, ErrorKind::PasswordRequired);
+    assert!(err.message.contains("doesn't allow printing"), "{}", err.message);
+    run(&[(NO_PRINT, Some(OWNER))], &PdfToolOp::PrintCopy).unwrap();
+}
+
 #[test]
 fn restriction_messages_name_what_is_limited() {
     let err = run(&[(NO_PRINT, None)], &PdfToolOp::RemovePassword).unwrap_err();

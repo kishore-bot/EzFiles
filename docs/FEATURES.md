@@ -26,7 +26,7 @@ Updated: 14 November 2026. This is the single feature and setup document for the
 
 | Area | Current scope |
 |---|---|
-| Android | Primary implementation. Minimum Android 8/API 26; compile/target Android 17/API 37. Current APK ABIs are arm64-v8a and x86_64. Features and codecs may require newer platform support. |
+| Android | Primary implementation. Minimum Android 11/API 30; compile/target Android 17/API 37. Current APK ABIs are arm64-v8a and x86_64. Features and codecs may require newer platform support. |
 | iOS | Shared UI and platform/App Intent adapters exist, but support is incomplete. Full macOS/Xcode linking, signing and physical-device acceptance remain pending. Video playback is unimplemented. |
 | Offline build | No Internet permission or Crashlytics SDK. Reading, parsing, local OCR and organization work locally. |
 | Optional Firebase build | Adds diagnostic networking, with reporting off by default and separately consented. Reading and document WebViews retain their offline restrictions. |

@@ -2,6 +2,8 @@ package com.ezfiles.reader.presentation
 
 import androidx.compose.runtime.Immutable
 import com.ezfiles.reader.domain.ContentBlock
+import kotlinx.collections.immutable.PersistentList
+import kotlinx.collections.immutable.persistentListOf
 
 /**
  * Most matches kept per search. Searching for "e" in a 16 MiB file would
@@ -33,14 +35,16 @@ data class BlockHighlights(val matches: List<SearchMatch>, val current: SearchMa
  */
 class SearchResults private constructor(
     val query: String,
-    val matches: List<SearchMatch>,
-    private val byPage: List<Map<Int, List<SearchMatch>>>,
+    private val matchList: PersistentList<SearchMatch>,
+    private val byPage: PersistentList<Map<Int, List<SearchMatch>>>,
     /** Stopped at the match limit; later pages were not scanned. */
     val capped: Boolean,
     private val limit: Int,
 ) {
-    constructor(query: String, limit: Int = MAX_SEARCH_MATCHES) : this(query, emptyList(), emptyList(), false, limit)
+    constructor(query: String, limit: Int = MAX_SEARCH_MATCHES) :
+        this(query, persistentListOf(), persistentListOf(), false, limit)
 
+    val matches: List<SearchMatch> get() = matchList
     val pagesSearched: Int get() = byPage.size
 
     /**
@@ -51,7 +55,7 @@ class SearchResults private constructor(
         if (query.isEmpty() || capped || pages.size <= pagesSearched) return this
         val found = ArrayList<SearchMatch>()
         val scanned = ArrayList<Map<Int, List<SearchMatch>>>()
-        var room = limit - matches.size
+        var room = limit - matchList.size
         for (pageIndex in pagesSearched until pages.size) {
             val pageStart = found.size
             pages[pageIndex].forEachIndexed { blockIndex, block ->
@@ -65,7 +69,7 @@ class SearchResults private constructor(
             scanned += found.subList(pageStart, found.size).groupBy { it.block }
             if (room <= 0) break
         }
-        return SearchResults(query, matches + found, byPage + scanned, room <= 0, limit)
+        return SearchResults(query, matchList.addAll(found), byPage.addAll(scanned), room <= 0, limit)
     }
 
     /** What the item showing [blocks] of [page] should highlight, or `null` if nothing. */

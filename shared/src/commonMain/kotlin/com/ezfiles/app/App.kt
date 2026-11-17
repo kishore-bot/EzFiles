@@ -176,6 +176,8 @@ class AppDependencies internal constructor(
     internal val speechSettings: com.ezfiles.reader.platform.SpeechSettings? = null,
     /** Where each video was left, to continue there. */
     internal val playbackMemory: com.ezfiles.reader.data.PlaybackMemory = com.ezfiles.reader.data.NoPlaybackMemory,
+    /** Fily's and Moonshine's model files, downloaded on request. */
+    internal val modelDownloads: com.ezfiles.reader.application.assistant.ModelDownloads? = null,
 )
 
 @OptIn(ExperimentalTime::class)
@@ -241,11 +243,17 @@ fun App(
             onOpenRequestHandled()
         }
     }
-    LaunchedEffect(dependencies.modelManager) {
+    // Fily loads once its model is on the phone: at start, or as soon as a download finishes.
+    val filyInstall by (dependencies.modelDownloads?.state(com.ezfiles.reader.application.assistant.AssistantModel.Fily)
+        ?: kotlinx.coroutines.flow.MutableStateFlow(com.ezfiles.reader.application.assistant.ModelInstall.Missing)).collectAsStateWithLifecycle()
+    LaunchedEffect(dependencies.modelManager, filyInstall) {
         val mm = dependencies.modelManager ?: return@LaunchedEffect
-        if (mm.state.value == com.ezfiles.reader.application.assistant.ModelState.Idle) {
+        val folder = dependencies.modelDownloads?.folder(com.ezfiles.reader.application.assistant.AssistantModel.Fily)
+            ?: return@LaunchedEffect
+        val state = mm.state.value
+        if (state == com.ezfiles.reader.application.assistant.ModelState.Idle || state == com.ezfiles.reader.application.assistant.ModelState.Error) {
             mm.load(
-                modelPath = "/data/local/tmp/Fily-EzFiles-350M-Q8_0.gguf",
+                modelPath = "$folder/${com.ezfiles.reader.application.assistant.AssistantModel.Fily.files.single().name}",
                 // Measured on an Adreno 810 with the Q8 model: OpenCL read prompts at ~350 tok/s
                 // and wrote ~22 tok/s, against ~600 and ~25 on the CPU, and its first run compiles
                 // kernels for a minute or more. Revisit with a Q4 model, which Adreno's kernels favour.
@@ -287,15 +295,27 @@ fun App(
             LocalGlancer provides dependencies.glancer,
             LocalDocumentEditor provides dependencies.documentEditor,
             LocalReaderControl provides dependencies.readerControl,
+            com.ezfiles.reader.presentation.assistant.LocalModelDownloads provides dependencies.modelDownloads,
             com.ezfiles.reader.presentation.viewers.LocalPlaybackMemory provides dependencies.playbackMemory,
         ) {
             PickerHost(state, pickedAction)
             // Fily stays open across screens, so "open my resume" then "next page" is one conversation.
             var voiceOpen by rememberSaveable { mutableStateOf(false) }
             val micPermission = rememberMicPermission { granted -> if (granted) voiceOpen = true }
+            // Without its model on the phone, the mic first offers the one-time download.
+            var gettingFily by rememberSaveable { mutableStateOf(false) }
+            val startVoice = { if (micPermission.granted) voiceOpen = true else micPermission.request() }
             val openVoice: (() -> Unit)? = if (dependencies.modelManager != null && dependencies.filySession != null) {
-                { if (micPermission.granted) voiceOpen = true else micPermission.request() }
+                {
+                    if (filyInstall == com.ezfiles.reader.application.assistant.ModelInstall.Installed) startVoice() else gettingFily = true
+                }
             } else null
+            if (gettingFily) {
+                com.ezfiles.reader.presentation.assistant.GetFilyDialog(
+                    onDismiss = { gettingFily = false },
+                    onReady = { gettingFily = false; startVoice() },
+                )
+            }
             val openDocument = (state as? ReaderUiState.Ready)?.ref ?: (state as? ReaderUiState.Playing)?.ref
             // "Open the second file": the list as the library shows it now, read when asked.
             LaunchedEffect(library) {

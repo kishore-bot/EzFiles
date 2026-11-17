@@ -13,3 +13,7 @@ fun interface DocumentPicker {
  */
 @Composable
 expect fun rememberDocumentPicker(onResult: (DocumentRef?) -> Unit): DocumentPicker
+
+/** Picks one or more files of any type (model files the user downloaded); their URIs, or empty. */
+@androidx.compose.runtime.Composable
+expect fun rememberModelFilePicker(onResult: (List<String>) -> Unit): () -> Unit

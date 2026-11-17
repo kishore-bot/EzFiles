@@ -80,6 +80,7 @@ fun VoiceAssistantSheet(
     onDismiss: () -> Unit,
     modelManager: ModelManager,
     session: FilySession,
+    speechEngine: com.ezfiles.reader.platform.SpeechEngine = com.ezfiles.reader.platform.SpeechEngine.System,
 ) {
     val scope = rememberCoroutineScope()
     val modelState by modelManager.state.collectAsState()
@@ -93,7 +94,7 @@ fun VoiceAssistantSheet(
 
     // Silent sessions in a row; after MAX_QUIET_RESTARTS Fily pauses instead of listening forever.
     var quietRestarts by remember { mutableIntStateOf(0) }
-    val speech = rememberSpeechRecognition(hints = session::speechHints) { result ->
+    val speech = rememberSpeechRecognition(hints = session::speechHints, engine = speechEngine) { result ->
         partialText = result.text
         if (result.isFinal && result.text.isNotBlank()) {
             quietRestarts = 0

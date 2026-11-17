@@ -40,3 +40,6 @@
 
 # Optional diagnostics backend is instantiated by manifest metadata via reflection.
 -keep class com.ezfiles.android.ConsentedCrashBackendFactory { public <init>(); public *; }
+
+# sherpa-onnx (Moonshine speech): its JNI reads these classes and fields by name.
+-keep class com.k2fsa.sherpa.onnx.** { *; }

@@ -1,0 +1,14 @@
+{
+  "hard_train": {
+    "conversations": 924,
+    "assistant_turns": 1337,
+    "sha256": "a73029438a27795ee2ee2d523a556202b564d63d4c20897a25a63888db8b1378",
+    "replay_rows": 384
+  },
+  "hard_validation": {
+    "conversations": 141,
+    "assistant_turns": 205,
+    "sha256": "d55d7c5d62119c31ff31ca486ddbeb0b31642051d5a7e6a8094e06c4da562000",
+    "replay_rows": 60
+  }
+}

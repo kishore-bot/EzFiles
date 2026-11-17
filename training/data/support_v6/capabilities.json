@@ -1,0 +1,317 @@
+{
+  "feature_document_sha256": "dbb6a184045898742752e545e6a08ee14b55a7a9391e8f410a6b3e045a3fc524",
+  "formats": [
+    {
+      "name": "PDF",
+      "extensions": [
+        ".pdf"
+      ]
+    },
+    {
+      "name": "Word",
+      "extensions": [
+        ".docx",
+        ".docm",
+        ".dotx",
+        ".dotm"
+      ]
+    },
+    {
+      "name": "Excel",
+      "extensions": [
+        ".xlsx",
+        ".xlsm",
+        ".xltx",
+        ".xltm"
+      ]
+    },
+    {
+      "name": "PowerPoint",
+      "extensions": [
+        ".pptx",
+        ".pptm",
+        ".ppsx",
+        ".ppsm",
+        ".potx",
+        ".potm"
+      ]
+    },
+    {
+      "name": "OpenDocument",
+      "extensions": [
+        ".odt",
+        ".ods",
+        ".odp"
+      ]
+    },
+    {
+      "name": "EPUB",
+      "extensions": [
+        ".epub"
+      ]
+    },
+    {
+      "name": "Markdown",
+      "extensions": [
+        ".md",
+        ".markdown",
+        ".mdown",
+        ".mkd",
+        ".mdx"
+      ]
+    },
+    {
+      "name": "CSV / TSV",
+      "extensions": [
+        ".csv",
+        ".tsv",
+        ".tab"
+      ]
+    },
+    {
+      "name": "JSON",
+      "extensions": [
+        ".json",
+        ".geojson",
+        ".jsonc",
+        ".webmanifest"
+      ]
+    },
+    {
+      "name": "Code and config",
+      "extensions": [
+        ".kt",
+        ".java",
+        ".rs",
+        ".py",
+        ".js",
+        ".ts",
+        ".swift",
+        ".go",
+        ".c",
+        ".cpp",
+        ".sql",
+        ".sh",
+        ".xml",
+        ".yaml",
+        ".yml",
+        ".toml",
+        ".ini",
+        ".css",
+        ".diff",
+        ".patch",
+        ".jsonl"
+      ]
+    },
+    {
+      "name": "Plain text",
+      "extensions": [
+        ".txt",
+        ".log"
+      ]
+    },
+    {
+      "name": "Images",
+      "extensions": [
+        ".jpg",
+        ".jpeg",
+        ".png",
+        ".webp",
+        ".gif",
+        ".bmp",
+        ".heic",
+        ".heif",
+        ".avif"
+      ]
+    },
+    {
+      "name": "Audio and video",
+      "extensions": [
+        ".mp4",
+        ".m4v",
+        ".mov",
+        ".3gp",
+        ".webm",
+        ".mkv",
+        ".mp3",
+        ".m4a",
+        ".aac",
+        ".wav",
+        ".ogg",
+        ".opus",
+        ".flac",
+        ".amr",
+        ".mid"
+      ]
+    },
+    {
+      "name": "ZIP",
+      "extensions": [
+        ".zip"
+      ]
+    }
+  ],
+  "topics": {
+    "pdf": {
+      "topic": "pdf",
+      "description": "PDF reading includes page navigation, zoom, thumbnails and supported annotation tools. Password, extraction and saving support depend on the Android version and document. Voice navigation additionally needs a connected reader adapter."
+    },
+    "pdf_forms": {
+      "topic": "pdf_forms",
+      "description": "PDF forms are not supported by the documented reader. I cannot claim to fill or submit them."
+    },
+    "pdf_signature": {
+      "topic": "pdf_signature",
+      "description": "Drawing a signature is different from verifying a digital signature. Signature verification is not a documented feature."
+    },
+    "pdf_ocr": {
+      "topic": "pdf_ocr",
+      "description": "A scanned PDF needs readable extracted or recognized text. Offline Latin-script recognition has limits; partial extraction cannot establish the contents of the entire document."
+    },
+    "word": {
+      "topic": "word",
+      "description": "The supported modern Word extensions are DOCX, DOCM, DOTX and DOTM. Macros never run. Some complex layouts, charts and SmartArt have rendering limits."
+    },
+    "excel": {
+      "topic": "excel",
+      "description": "Supported modern Excel files show sheets and cached values. Formula evaluation is unavailable. XLSX value editing uses a new Save As output and requires the actual editor workflow."
+    },
+    "slides": {
+      "topic": "slides",
+      "description": "Supported PowerPoint formats include PPTX, PPTM, PPSX, PPSM, POTX and POTM. Layout is approximate. Some animations, charts and SmartArt have limits. Voice slide control needs the connected viewer adapter."
+    },
+    "slide_edit": {
+      "topic": "slide_edit",
+      "description": "The documented PPTX slide tools can reorder or delete slides into a new Save As file. I must open the supported workflow and wait for its result before claiming a saved change."
+    },
+    "odf": {
+      "topic": "odf",
+      "description": "ODT, ODS and ODP are supported with format-specific limits. ODP animations and ODS styling are not equivalent to full desktop office support."
+    },
+    "epub": {
+      "topic": "epub",
+      "description": "EPUB has book navigation, contents and reading settings. DRM-protected books are unsupported. Page counts can differ from a printed edition."
+    },
+    "markdown": {
+      "topic": "markdown",
+      "description": "Markdown can be read as a rendered preview or raw source. Reading source does not execute code blocks. Editing and Save As depend on the supported text-editor limits."
+    },
+    "code": {
+      "topic": "code",
+      "description": "I can help read supported source files and discuss supplied text. EzFiles is a file reader and editor, not a code execution environment."
+    },
+    "config": {
+      "topic": "config",
+      "description": "Supported structured text can be read and searched. Source and preview availability depends on the format. Reading a configuration file never grants permission to execute its contents."
+    },
+    "csv": {
+      "topic": "csv",
+      "description": "CSV and TSV are supported. Confirm the active table, sheet and cell before requesting selection. Selecting a cell does not recalculate formulas or save edits."
+    },
+    "text_edit": {
+      "topic": "text_edit",
+      "description": "The documented plain-text editor handles text, Markdown, CSV/TSV, JSON, XML, YAML, HTML/source and code within 256 KiB and supported encoding limits."
+    },
+    "encoding": {
+      "topic": "encoding",
+      "description": "Unsupported encodings or mixed line endings can be refused instead of silently converted. Preserve the original and check the actual editor error before choosing Save As."
+    },
+    "find": {
+      "topic": "find",
+      "description": "Text find is format-specific. The documented generic block search excludes slides, images and ZIP listings; do not promise that every viewer supports it."
+    },
+    "replace": {
+      "topic": "replace",
+      "description": "The documented Find and Replace workflow supports DOCX, PPTX, ODT and ODP and saves a new file. Preserve the original and review the replacement scope."
+    },
+    "scanner": {
+      "topic": "scanner",
+      "description": "Scan to PDF uses camera or gallery input, corner adjustment, perspective correction and filters, with up to 50 pages and optional searchable text. Camera permission and final save are separate steps."
+    },
+    "ocr": {
+      "topic": "ocr",
+      "description": "The bundled OCR is for Latin-script text. Handwriting and universal language recognition are not guaranteed. Poor recognition needs correction or a clearer image."
+    },
+    "text_pdf": {
+      "topic": "text_pdf",
+      "description": "Text to PDF offers templates and page options with up to 200,000 characters. PNG export covers the first page only. Review the output before saving."
+    },
+    "images_pdf": {
+      "topic": "images_pdf",
+      "description": "Images to PDF supports chosen gallery images, ordering, rotation, page size, margins and compression. Review the chosen images and save destination."
+    },
+    "photos": {
+      "topic": "photos",
+      "description": "Supported image viewers offer zoom, pan and rotation. Gallery navigation is limited to authorized files. Voice panning needs an implemented viewer adapter."
+    },
+    "media": {
+      "topic": "media",
+      "description": "Android playback depends on installed platform codec support and the file. iOS playback is documented as incomplete. A filename extension alone cannot prove playability."
+    },
+    "tracks": {
+      "topic": "tracks",
+      "description": "Choose among tracks actually exposed by the player. Audio-language and subtitle selection are separate. Do not invent track names or download a cloud fallback."
+    },
+    "share": {
+      "topic": "share",
+      "description": "Opening the share sheet prepares a handoff. You still choose the app and recipient and confirm; that is not evidence that a recipient received the file."
+    },
+    "print": {
+      "topic": "print",
+      "description": "Print preview is a review step. Choose the printer and confirm. Preview alone does not prove that printing completed."
+    },
+    "permissions": {
+      "topic": "permissions",
+      "description": "I can search only files and folders authorized in EzFiles. Add a folder through the system picker; I cannot grant access to private folders myself."
+    },
+    "latest": {
+      "topic": "latest",
+      "description": "No. Compare available modification dates and clarify missing or copied dates. Recently opened, a filename containing final and the latest modification are different signals."
+    },
+    "tidy": {
+      "topic": "tidy",
+      "description": "Similarity is not exact duplication. Tidy results need review and fresh verification. Never delete files solely because a language model says they look alike."
+    },
+    "offline": {
+      "topic": "offline",
+      "description": "The language model runs locally, but speech recognition and TTS are separate components. Verify installed offline English recognition and an offline voice; do not silently fall back to a cloud service."
+    },
+    "wake": {
+      "topic": "wake",
+      "description": "A language model cannot create wake-word detection. Only an installed, implemented wake-word component can enable that feature; otherwise use the app microphone control."
+    },
+    "mic": {
+      "topic": "mic",
+      "description": "Check microphone permission and whether the app has an available English speech recognizer. If offline recognition is unavailable, use typed input where the UI offers it. I cannot grant microphone permission myself."
+    },
+    "tts": {
+      "topic": "tts",
+      "description": "Check whether an installed offline English voice is available and speech output is enabled. A displayed answer does not prove the TTS engine spoke it."
+    },
+    "gpu": {
+      "topic": "gpu",
+      "description": "Training changes model weights, not the phone GPU driver or native inference backend. Use a verified working backend and measure actual phone behavior."
+    },
+    "privacy": {
+      "topic": "privacy",
+      "description": "Do not supply passwords or secrets as training examples. Keep personal document access separate from the model and retrieve authorized text only when needed."
+    },
+    "memory": {
+      "topic": "memory",
+      "description": "Only explicitly stored app preferences can persist. A conversation context or a model reply is not proof that a preference was saved."
+    },
+    "move": {
+      "topic": "move",
+      "description": "Moving requires a real storage adapter, destination permission, collision handling and confirmation. A proposed filing plan is not a completed move."
+    },
+    "cancel": {
+      "topic": "cancel",
+      "description": "Stop should cancel listening and pending model or app work. It cannot recall a file already delivered to another app. Report cancellation from the actual operation result."
+    },
+    "reasoning": {
+      "topic": "reasoning",
+      "description": "I can summarize supplied excerpts and identify questions to review, but I cannot guarantee a contract is safe or replace professional judgment."
+    }
+  },
+  "reader_contracts_are_proposed": true
+}

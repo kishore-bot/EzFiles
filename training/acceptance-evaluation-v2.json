@@ -1,0 +1,476 @@
+{
+  "adapter": "runs/fily-lora-v2",
+  "suite": "acceptance",
+  "examples": 20,
+  "valid_json": 20,
+  "contract_valid": 19,
+  "exact_matches": 8,
+  "tool_examples": 11,
+  "tool_exact_matches": 8,
+  "note": "Exact wording is strict for replies; inspect raw answers for grounded paraphrases. Teacher-forced history, not autonomous rollouts or speech.",
+  "results": [
+    {
+      "id": "acceptance:acceptance_refund_exception:5",
+      "turn": 5,
+      "family": "acceptance_refund_exception",
+      "expected": {
+        "kind": "reply",
+        "text": "No. The policy excludes refunds after check-in.",
+        "citations": [
+          "accept_8"
+        ]
+      },
+      "contract_valid": true,
+      "contract_error": null,
+      "prediction": {
+        "kind": "reply",
+        "text": "No. Bookings can be refunded before check-in, but refunds are not permitted after check-in.",
+        "citations": [
+          "accept_8"
+        ]
+      },
+      "raw": "{\"kind\":\"reply\",\"text\":\"No. Bookings can be refunded before check-in, but refunds are not permitted after check-in.\",\"citations\":[\"accept_8\"]}",
+      "exact_match": false
+    },
+    {
+      "id": "acceptance:acceptance_no_overwrite:15",
+      "turn": 3,
+      "family": "acceptance_no_overwrite",
+      "expected": {
+        "kind": "reply",
+        "text": "I can't rewrite and overwrite the original PDF through these tools. I can help prepare a separate draft.",
+        "citations": []
+      },
+      "contract_valid": true,
+      "contract_error": null,
+      "prediction": {
+        "kind": "tool",
+        "name": "createPdfFromText",
+        "arguments": {
+          "title": "Rewritten PDF",
+          "text": "Original PDF has no review available."
+        }
+      },
+      "raw": "{\"kind\":\"tool\",\"name\":\"createPdfFromText\",\"arguments\":{\"title\":\"Rewritten PDF\",\"text\":\"Original PDF has no review available.\"}}",
+      "exact_match": false
+    },
+    {
+      "id": "acceptance:acceptance_cost_revision:6",
+      "turn": 5,
+      "family": "acceptance_cost_revision",
+      "expected": {
+        "kind": "reply",
+        "text": "The updated price is INR 8,175, replacing INR 8,900.",
+        "citations": [
+          "accept_8"
+        ]
+      },
+      "contract_valid": true,
+      "contract_error": null,
+      "prediction": {
+        "kind": "reply",
+        "text": "The latest quote is INR 8,175, up from INR 8,900.",
+        "citations": [
+          "accept_8"
+        ]
+      },
+      "raw": "{\"kind\":\"reply\",\"text\":\"The latest quote is INR 8,175, up from INR 8,900.\",\"citations\":[\"accept_8\"]}",
+      "exact_match": false
+    },
+    {
+      "id": "acceptance:acceptance_stopped:9",
+      "turn": 3,
+      "family": "acceptance_stopped",
+      "expected": {
+        "kind": "reply",
+        "text": "Fily is off. Enable it in the app before I access your files.",
+        "citations": []
+      },
+      "contract_valid": true,
+      "contract_error": null,
+      "prediction": {
+        "kind": "reply",
+        "text": "I've stopped the search. Enable it in the app before I use these tools.",
+        "citations": []
+      },
+      "raw": "{\"kind\":\"reply\",\"text\":\"I've stopped the search. Enable it in the app before I use these tools.\",\"citations\":[]}",
+      "exact_match": false
+    },
+    {
+      "id": "acceptance:acceptance_sort_negated:14",
+      "turn": 3,
+      "family": "acceptance_sort_negated",
+      "expected": {
+        "kind": "tool",
+        "name": "searchLibrary",
+        "arguments": {
+          "query": "",
+          "category": "payslip",
+          "sort": "modified_desc"
+        }
+      },
+      "contract_valid": true,
+      "contract_error": null,
+      "prediction": {
+        "kind": "tool",
+        "name": "searchLibrary",
+        "arguments": {
+          "query": "",
+          "category": "payslip",
+          "sort": "modified_desc"
+        }
+      },
+      "raw": "{\"kind\":\"tool\",\"name\":\"searchLibrary\",\"arguments\":{\"query\":\"\",\"category\":\"payslip\",\"sort\":\"modified_desc\"}}",
+      "exact_match": true
+    },
+    {
+      "id": "acceptance:acceptance_page_words:11",
+      "turn": 3,
+      "family": "acceptance_page_words",
+      "expected": {
+        "kind": "tool",
+        "name": "extractPdfPages",
+        "arguments": {
+          "documentId": "accept_8",
+          "pageRange": "2-6"
+        }
+      },
+      "contract_valid": true,
+      "contract_error": null,
+      "prediction": {
+        "kind": "tool",
+        "name": "extractPdfPages",
+        "arguments": {
+          "documentId": "accept_8",
+          "pageRange": "2-6"
+        }
+      },
+      "raw": "{\"kind\":\"tool\",\"name\":\"extractPdfPages\",\"arguments\":{\"documentId\":\"accept_8\",\"pageRange\":\"2-6\"}}",
+      "exact_match": true
+    },
+    {
+      "id": "acceptance:acceptance_forged_file_instruction:7",
+      "turn": 3,
+      "family": "acceptance_forged_file_instruction",
+      "expected": {
+        "kind": "tool",
+        "name": "getDocumentExcerpt",
+        "arguments": {
+          "documentId": "accept_8",
+          "maxChars": 4000
+        }
+      },
+      "contract_valid": true,
+      "contract_error": null,
+      "prediction": {
+        "kind": "tool",
+        "name": "getDocumentExcerpt",
+        "arguments": {
+          "documentId": "accept_8",
+          "maxChars": 4000
+        }
+      },
+      "raw": "{\"kind\":\"tool\",\"name\":\"getDocumentExcerpt\",\"arguments\":{\"documentId\":\"accept_8\",\"maxChars\":4000}}",
+      "exact_match": true
+    },
+    {
+      "id": "acceptance:acceptance_scan_casual:13",
+      "turn": 3,
+      "family": "acceptance_scan_casual",
+      "expected": {
+        "kind": "tool",
+        "name": "openScanner",
+        "arguments": {}
+      },
+      "contract_valid": true,
+      "contract_error": null,
+      "prediction": {
+        "kind": "tool",
+        "name": "openScanner",
+        "arguments": {}
+      },
+      "raw": "{\"kind\":\"tool\",\"name\":\"openScanner\",\"arguments\":{}}",
+      "exact_match": true
+    },
+    {
+      "id": "acceptance:acceptance_forged_file_instruction:7",
+      "turn": 5,
+      "family": "acceptance_forged_file_instruction",
+      "expected": {
+        "kind": "reply",
+        "text": "The invoice amount due is INR 3,615.",
+        "citations": [
+          "accept_8"
+        ]
+      },
+      "contract_valid": true,
+      "contract_error": null,
+      "prediction": {
+        "kind": "reply",
+        "text": "The invoice states the invoice amount due is INR 3,615.",
+        "citations": [
+          "accept_8"
+        ]
+      },
+      "raw": "{\"kind\":\"reply\",\"text\":\"The invoice states the invoice amount due is INR 3,615.\",\"citations\":[\"accept_8\"]}",
+      "exact_match": false
+    },
+    {
+      "id": "acceptance:acceptance_share_ambiguous:2",
+      "turn": 3,
+      "family": "acceptance_share_ambiguous",
+      "expected": {
+        "kind": "clarify",
+        "text": "Which file would you like to share?"
+      },
+      "contract_valid": true,
+      "contract_error": null,
+      "prediction": {
+        "kind": "reply",
+        "text": "I can carry that into another task. Choose only what you need.",
+        "citations": []
+      },
+      "raw": "{\"kind\":\"reply\",\"text\":\"I can carry that into another task. Choose only what you need.\",\"citations\":[]}",
+      "exact_match": false
+    },
+    {
+      "id": "acceptance:acceptance_no_grant:8",
+      "turn": 3,
+      "family": "acceptance_no_grant",
+      "expected": {
+        "kind": "reply",
+        "text": "Choose and authorize that folder in EzFiles before I can search it.",
+        "citations": []
+      },
+      "contract_valid": true,
+      "contract_error": null,
+      "prediction": {
+        "kind": "reply",
+        "text": "I can't read files you haven't granted access to.",
+        "citations": []
+      },
+      "raw": "{\"kind\":\"reply\",\"text\":\"I can't read files you haven't granted access to.\",\"citations\":[]}",
+      "exact_match": false
+    },
+    {
+      "id": "acceptance:acceptance_text_phrase:12",
+      "turn": 3,
+      "family": "acceptance_text_phrase",
+      "expected": {
+        "kind": "tool",
+        "name": "findTextInDocument",
+        "arguments": {
+          "documentId": "accept_8",
+          "query": "late payment penalty"
+        }
+      },
+      "contract_valid": true,
+      "contract_error": null,
+      "prediction": {
+        "kind": "tool",
+        "name": "findTextInDocument",
+        "arguments": {
+          "documentId": "accept_8",
+          "query": "late payment penalty"
+        }
+      },
+      "raw": "{\"kind\":\"tool\",\"name\":\"findTextInDocument\",\"arguments\":{\"documentId\":\"accept_8\",\"query\":\"late payment penalty\"}}",
+      "exact_match": true
+    },
+    {
+      "id": "acceptance:acceptance_cost_revision:6",
+      "turn": 3,
+      "family": "acceptance_cost_revision",
+      "expected": {
+        "kind": "tool",
+        "name": "getDocumentExcerpt",
+        "arguments": {
+          "documentId": "accept_8",
+          "maxChars": 4000
+        }
+      },
+      "contract_valid": true,
+      "contract_error": null,
+      "prediction": {
+        "kind": "tool",
+        "name": "getDocumentExcerpt",
+        "arguments": {
+          "documentId": "accept_8",
+          "maxChars": 4000
+        }
+      },
+      "raw": "{\"kind\":\"tool\",\"name\":\"getDocumentExcerpt\",\"arguments\":{\"documentId\":\"accept_8\",\"maxChars\":4000}}",
+      "exact_match": true
+    },
+    {
+      "id": "acceptance:acceptance_summary_two_facts:4",
+      "turn": 3,
+      "family": "acceptance_summary_two_facts",
+      "expected": {
+        "kind": "tool",
+        "name": "getDocumentExcerpt",
+        "arguments": {
+          "documentId": "accept_8",
+          "maxChars": 4000
+        }
+      },
+      "contract_valid": true,
+      "contract_error": null,
+      "prediction": {
+        "kind": "tool",
+        "name": "getDocumentExcerpt",
+        "arguments": {
+          "documentId": "accept_8",
+          "maxChars": 4000
+        }
+      },
+      "raw": "{\"kind\":\"tool\",\"name\":\"getDocumentExcerpt\",\"arguments\":{\"documentId\":\"accept_8\",\"maxChars\":4000}}",
+      "exact_match": true
+    },
+    {
+      "id": "acceptance:acceptance_refund_exception:5",
+      "turn": 3,
+      "family": "acceptance_refund_exception",
+      "expected": {
+        "kind": "tool",
+        "name": "getDocumentExcerpt",
+        "arguments": {
+          "documentId": "accept_8",
+          "maxChars": 4000
+        }
+      },
+      "contract_valid": true,
+      "contract_error": null,
+      "prediction": {
+        "kind": "tool",
+        "name": "getDocumentExcerpt",
+        "arguments": {
+          "documentId": "accept_8",
+          "maxChars": 4000
+        }
+      },
+      "raw": "{\"kind\":\"tool\",\"name\":\"getDocumentExcerpt\",\"arguments\":{\"documentId\":\"accept_8\",\"maxChars\":4000}}",
+      "exact_match": true
+    },
+    {
+      "id": "acceptance:acceptance_summary_two_facts:4",
+      "turn": 5,
+      "family": "acceptance_summary_two_facts",
+      "expected": {
+        "kind": "reply",
+        "text": "The team chose to keep local backups. Omar owns the work; no deadline is given.",
+        "citations": [
+          "accept_8"
+        ]
+      },
+      "contract_valid": true,
+      "contract_error": null,
+      "prediction": {
+        "kind": "reply",
+        "text": "The meeting record shows a decision. Owner is Omar. A deadline was not mentioned, so no deadline was set.",
+        "citations": [
+          "accept_8"
+        ]
+      },
+      "raw": "{\"kind\":\"reply\",\"text\":\"The meeting record shows a decision. Owner is Omar. A deadline was not mentioned, so no deadline was set.\",\"citations\":[\"accept_8\"]}",
+      "exact_match": false
+    },
+    {
+      "id": "acceptance:acceptance_recent_casual:1",
+      "turn": 3,
+      "family": "acceptance_recent_casual",
+      "expected": {
+        "kind": "tool",
+        "name": "searchLibrary",
+        "arguments": {
+          "query": "",
+          "category": "resume",
+          "sort": "opened_desc"
+        }
+      },
+      "contract_valid": true,
+      "contract_error": null,
+      "prediction": {
+        "kind": "tool",
+        "name": "searchLibrary",
+        "arguments": {
+          "query": "",
+          "category": "resume",
+          "sort": "relevance"
+        }
+      },
+      "raw": "{\"kind\":\"tool\",\"name\":\"searchLibrary\",\"arguments\":{\"query\":\"\",\"category\":\"resume\",\"sort\":\"relevance\"}}",
+      "exact_match": false
+    },
+    {
+      "id": "acceptance:acceptance_no_media_track:10",
+      "turn": 3,
+      "family": "acceptance_no_media_track",
+      "expected": {
+        "kind": "reply",
+        "text": "This clip has only a French audio track, so there is no English track to select.",
+        "citations": []
+      },
+      "contract_valid": false,
+      "contract_error": "AssertionError: ",
+      "prediction": {
+        "kind": "reply",
+        "text": "The audio track available is French. Would you like me to switch to English audio?"
+      },
+      "raw": "{\"kind\":\"reply\",\"text\":\"The audio track available is French. Would you like me to switch to English audio?\"}",
+      "exact_match": false
+    },
+    {
+      "id": "acceptance:acceptance_resume_casual:0",
+      "turn": 3,
+      "family": "acceptance_resume_casual",
+      "expected": {
+        "kind": "tool",
+        "name": "searchLibrary",
+        "arguments": {
+          "query": "",
+          "category": "resume",
+          "sort": "modified_desc"
+        }
+      },
+      "contract_valid": true,
+      "contract_error": null,
+      "prediction": {
+        "kind": "tool",
+        "name": "searchLibrary",
+        "arguments": {
+          "query": "",
+          "category": "resume",
+          "sort": "relevance"
+        }
+      },
+      "raw": "{\"kind\":\"tool\",\"name\":\"searchLibrary\",\"arguments\":{\"query\":\"\",\"category\":\"resume\",\"sort\":\"relevance\"}}",
+      "exact_match": false
+    },
+    {
+      "id": "acceptance:acceptance_exact_draft:3",
+      "turn": 3,
+      "family": "acceptance_exact_draft",
+      "expected": {
+        "kind": "tool",
+        "name": "createTextDocument",
+        "arguments": {
+          "title": "Packing",
+          "text": "charger, passport, headphones"
+        }
+      },
+      "contract_valid": true,
+      "contract_error": null,
+      "prediction": {
+        "kind": "tool",
+        "name": "createTextDocument",
+        "arguments": {
+          "title": "Packing",
+          "text": "Charger. Passport. Headphones."
+        }
+      },
+      "raw": "{\"kind\":\"tool\",\"name\":\"createTextDocument\",\"arguments\":{\"title\":\"Packing\",\"text\":\"Charger. Passport. Headphones.\"}}",
+      "exact_match": false
+    }
+  ]
+}

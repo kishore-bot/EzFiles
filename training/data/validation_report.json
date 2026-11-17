@@ -1,0 +1,32 @@
+{
+  "train": {
+    "conversations": 2494,
+    "families": 104,
+    "tools_covered": 37,
+    "outputs": {
+      "tool": 2232,
+      "reply": 792,
+      "clarify": 166
+    }
+  },
+  "validation": {
+    "conversations": 311,
+    "families": 104,
+    "tools_covered": 37,
+    "outputs": {
+      "tool": 279,
+      "reply": 98,
+      "clarify": 21
+    }
+  },
+  "test": {
+    "conversations": 311,
+    "families": 104,
+    "tools_covered": 37,
+    "outputs": {
+      "tool": 279,
+      "reply": 98,
+      "clarify": 21
+    }
+  }
+}

@@ -1,0 +1,174 @@
+{
+  "features_sha256": "dbb6a184045898742752e545e6a08ee14b55a7a9391e8f410a6b3e045a3fc524",
+  "formats": [
+    {
+      "name": "PDF",
+      "extensions": [
+        ".pdf"
+      ]
+    },
+    {
+      "name": "Word",
+      "extensions": [
+        ".docx",
+        ".docm",
+        ".dotx",
+        ".dotm"
+      ]
+    },
+    {
+      "name": "Excel",
+      "extensions": [
+        ".xlsx",
+        ".xlsm",
+        ".xltx",
+        ".xltm"
+      ]
+    },
+    {
+      "name": "PowerPoint",
+      "extensions": [
+        ".pptx",
+        ".pptm",
+        ".ppsx",
+        ".ppsm",
+        ".potx",
+        ".potm"
+      ]
+    },
+    {
+      "name": "OpenDocument",
+      "extensions": [
+        ".odt",
+        ".ods",
+        ".odp"
+      ]
+    },
+    {
+      "name": "EPUB",
+      "extensions": [
+        ".epub"
+      ]
+    },
+    {
+      "name": "Markdown",
+      "extensions": [
+        ".md",
+        ".markdown",
+        ".mdown",
+        ".mkd",
+        ".mdx"
+      ]
+    },
+    {
+      "name": "CSV / TSV",
+      "extensions": [
+        ".csv",
+        ".tsv",
+        ".tab"
+      ]
+    },
+    {
+      "name": "JSON",
+      "extensions": [
+        ".json",
+        ".geojson",
+        ".jsonc",
+        ".webmanifest"
+      ]
+    },
+    {
+      "name": "Code and config",
+      "extensions": [
+        ".kt",
+        ".java",
+        ".rs",
+        ".py",
+        ".js",
+        ".ts",
+        ".swift",
+        ".go",
+        ".c",
+        ".cpp",
+        ".sql",
+        ".sh",
+        ".xml",
+        ".yaml",
+        ".yml",
+        ".toml",
+        ".ini",
+        ".css",
+        ".diff",
+        ".patch",
+        ".jsonl"
+      ]
+    },
+    {
+      "name": "Plain text",
+      "extensions": [
+        ".txt",
+        ".log"
+      ]
+    },
+    {
+      "name": "Images",
+      "extensions": [
+        ".jpg",
+        ".jpeg",
+        ".png",
+        ".webp",
+        ".gif",
+        ".bmp",
+        ".heic",
+        ".heif",
+        ".avif"
+      ]
+    },
+    {
+      "name": "Audio and video",
+      "extensions": [
+        ".mp4",
+        ".m4v",
+        ".mov",
+        ".3gp",
+        ".webm",
+        ".mkv",
+        ".mp3",
+        ".m4a",
+        ".aac",
+        ".wav",
+        ".ogg",
+        ".opus",
+        ".flac",
+        ".amr",
+        ".mid"
+      ]
+    },
+    {
+      "name": "ZIP",
+      "extensions": [
+        ".zip"
+      ]
+    }
+  ],
+  "splits": {
+    "domain_train": {
+      "conversations": 744,
+      "assistant_targets": 824,
+      "sha256": "38026c834234b5eb709ecb103aa5b50b3d0294071257f3fd0ebe8a7200be3679",
+      "replay": 160
+    },
+    "domain_validation": {
+      "conversations": 142,
+      "assistant_targets": 160,
+      "sha256": "abb59c7a0bb44c8ea187eeb734a21926eb56094444edcb3192a6e23322c88d61",
+      "replay": 40
+    },
+    "domain_test": {
+      "conversations": 102,
+      "assistant_targets": 108,
+      "sha256": "4501faeb1e2d32ed0dfb52cb81eb612656349bb1207bf155c4fac56efb602d75",
+      "replay": 0
+    }
+  }
+}

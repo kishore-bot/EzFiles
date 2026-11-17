@@ -42,7 +42,17 @@ ezjks
 /androidApp/google-services.json
 
 # Local Fily datasets, Python environment, model weights and checkpoints
-/training/
+# Training workspace: scripts, docs and reports are tracked; environments, generated data,
+# checkpoints, exported models and tool binaries are not (rebuild them; see training/README.md).
+/training/.venv/
+/training/__pycache__/
+/training/cache/
+/training/runs/
+/training/exports/
+/training/tools/
+/training/data/**/*.jsonl
+/training/data/**/*.txt
+/training/*.log
 /.vscode
 # Downloaded build dependencies (sherpa-onnx), see shared/build.gradle.kts
 /.cache/

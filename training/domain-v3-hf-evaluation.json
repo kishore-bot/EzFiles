@@ -1,0 +1,253 @@
+{
+  "adapter": "runs/fily-domain-v3",
+  "suite": "domain_test",
+  "examples": 12,
+  "valid_json": 12,
+  "contract_valid": 12,
+  "exact_matches": 3,
+  "tool_examples": 2,
+  "tool_exact_matches": 2,
+  "note": "Exact wording is strict for replies; inspect raw answers for grounded paraphrases. Teacher-forced history, not autonomous rollouts or speech.",
+  "results": [
+    {
+      "id": "domain_test:domain_social_3:1",
+      "turn": 3,
+      "family": "domain_social_3",
+      "expected": {
+        "kind": "reply",
+        "text": "Try asking me to find your latest resume, summarize a document, or help with a PDF.",
+        "citations": []
+      },
+      "contract_valid": true,
+      "contract_error": null,
+      "prediction": {
+        "kind": "reply",
+        "text": "Try asking me to find your latest resume, summarize a document, or help with a PDF.",
+        "citations": []
+      },
+      "raw": "{\"kind\":\"reply\",\"text\":\"Try asking me to find your latest resume, summarize a document, or help with a PDF.\",\"citations\":[]}",
+      "exact_match": true
+    },
+    {
+      "id": "domain_test:domain_help_media:1",
+      "turn": 3,
+      "family": "domain_help_media",
+      "expected": {
+        "kind": "reply",
+        "text": "Android can play supported local audio and video with playback, seek and track controls. Codec support varies, and iOS playback is unimplemented.",
+        "citations": []
+      },
+      "contract_valid": true,
+      "contract_error": null,
+      "prediction": {
+        "kind": "reply",
+        "text": "You can choose the format and get the supported library. Audio and video playback has audio and video codecs; format-specific limitations apply.",
+        "citations": []
+      },
+      "raw": "{\"kind\":\"reply\",\"text\":\"You can choose the format and get the supported library. Audio and video playback has audio and video codecs; format-specific limitations apply.\",\"citations\":[]}",
+      "exact_match": false
+    },
+    {
+      "id": "domain_test:domain_help_pdf:1",
+      "turn": 3,
+      "family": "domain_help_pdf",
+      "expected": {
+        "kind": "reply",
+        "text": "EzFiles can read PDFs, navigate pages, find supported text, add supported annotations and signatures, and prepare merge, extraction and export workflows. Device and document restrictions apply.",
+        "citations": []
+      },
+      "contract_valid": true,
+      "contract_error": null,
+      "prediction": {
+        "kind": "reply",
+        "text": "EzFiles can read supported PDF files. Device and layout restrictions are not interpreted.",
+        "citations": []
+      },
+      "raw": "{\"kind\":\"reply\",\"text\":\"EzFiles can read supported PDF files. Device and layout restrictions are not interpreted.\",\"citations\":[]}",
+      "exact_match": false
+    },
+    {
+      "id": "domain_test:domain_format_5:1000",
+      "turn": 3,
+      "family": "domain_format_5",
+      "expected": {
+        "kind": "reply",
+        "text": "For EPUB, the listed extensions are .epub. Device and format-specific limitations apply.",
+        "citations": []
+      },
+      "contract_valid": true,
+      "contract_error": null,
+      "prediction": {
+        "kind": "reply",
+        "text": "For EPUB, the listed extensions are .epub, .epub+xml, .epub+html. Device and format-specific limitations apply.",
+        "citations": []
+      },
+      "raw": "{\"kind\":\"reply\",\"text\":\"For EPUB, the listed extensions are .epub, .epub+xml, .epub+html. Device and format-specific limitations apply.\",\"citations\":[]}",
+      "exact_match": false
+    },
+    {
+      "id": "domain_test:domain_help_text:0",
+      "turn": 3,
+      "family": "domain_help_text",
+      "expected": {
+        "kind": "reply",
+        "text": "You can read, search and edit supported plain-text and source files within the editor's size and encoding limits.",
+        "citations": []
+      },
+      "contract_valid": true,
+      "contract_error": null,
+      "prediction": {
+        "kind": "reply",
+        "text": "EzFiles can read plain text, notally extract and prepare output.",
+        "citations": []
+      },
+      "raw": "{\"kind\":\"reply\",\"text\":\"EzFiles can read plain text, notally extract and prepare output.\",\"citations\":[]}",
+      "exact_match": false
+    },
+    {
+      "id": "domain_test:domain_recent_spoken:1",
+      "turn": 3,
+      "family": "domain_recent_spoken",
+      "expected": {
+        "kind": "tool",
+        "name": "searchLibrary",
+        "arguments": {
+          "query": "",
+          "category": "resume",
+          "sort": "opened_desc"
+        }
+      },
+      "contract_valid": true,
+      "contract_error": null,
+      "prediction": {
+        "kind": "tool",
+        "name": "searchLibrary",
+        "arguments": {
+          "query": "",
+          "category": "resume",
+          "sort": "opened_desc"
+        }
+      },
+      "raw": "{\"kind\":\"tool\",\"name\":\"searchLibrary\",\"arguments\":{\"query\":\"\",\"category\":\"resume\",\"sort\":\"opened_desc\"}}",
+      "exact_match": true
+    },
+    {
+      "id": "domain_test:domain_search_followup:1",
+      "turn": 7,
+      "family": "domain_search_followup",
+      "expected": {
+        "kind": "tool",
+        "name": "openDocument",
+        "arguments": {
+          "documentId": "Zfile_702"
+        }
+      },
+      "contract_valid": true,
+      "contract_error": null,
+      "prediction": {
+        "kind": "tool",
+        "name": "openDocument",
+        "arguments": {
+          "documentId": "Zfile_702"
+        }
+      },
+      "raw": "{\"kind\":\"tool\",\"name\":\"openDocument\",\"arguments\":{\"documentId\":\"Zfile_702\"}}",
+      "exact_match": true
+    },
+    {
+      "id": "domain_test:domain_format_9:1000",
+      "turn": 3,
+      "family": "domain_format_9",
+      "expected": {
+        "kind": "reply",
+        "text": "For Code and config, the listed extensions are .kt, .java, .rs, .py, .js, .ts, .swift, .go, .c, .cpp, .sql, .sh, .xml, .yaml, .yml, .toml, .ini, .css, .diff, .patch, .jsonl. Device and format-specific limitations apply.",
+        "citations": []
+      },
+      "contract_valid": true,
+      "contract_error": null,
+      "prediction": {
+        "kind": "reply",
+        "text": "For supported extensions, the listed extensions are .docx .docxx .pdf .pptx .pptxx .exe .exe. Device and format-specific limitations apply.",
+        "citations": []
+      },
+      "raw": "{\"kind\":\"reply\",\"text\":\"For supported extensions, the listed extensions are .docx .docxx .pdf .pptx .pptxx .exe .exe. Device and format-specific limitations apply.\",\"citations\":[]}",
+      "exact_match": false
+    },
+    {
+      "id": "domain_test:domain_format_2:1000",
+      "turn": 3,
+      "family": "domain_format_2",
+      "expected": {
+        "kind": "reply",
+        "text": "For Excel, the listed extensions are .xlsx, .xlsm, .xltx, .xltm. Device and format-specific limitations apply.",
+        "citations": []
+      },
+      "contract_valid": true,
+      "contract_error": null,
+      "prediction": {
+        "kind": "reply",
+        "text": "For Excel, the listed extensions are .xlsx, .xlsm, .xltx, .xltm, .xltxp, .xltp, .xltmr, .xltmrk, .xltmrkp, .xltm. Device and format-specific limitations apply.",
+        "citations": []
+      },
+      "raw": "{\"kind\":\"reply\",\"text\":\"For Excel, the listed extensions are .xlsx, .xlsm, .xltx, .xltm, .xltxp, .xltp, .xltmr, .xltmrk, .xltmrkp, .xltm. Device and format-specific limitations apply.\",\"citations\":[]}",
+      "exact_match": false
+    },
+    {
+      "id": "domain_test:domain_help_pdf:0",
+      "turn": 3,
+      "family": "domain_help_pdf",
+      "expected": {
+        "kind": "reply",
+        "text": "EzFiles can read PDFs, navigate pages, find supported text, add supported annotations and signatures, and prepare merge, extraction and export workflows. Device and document restrictions apply.",
+        "citations": []
+      },
+      "contract_valid": true,
+      "contract_error": null,
+      "prediction": {
+        "kind": "reply",
+        "text": "EzFiles can read PDFs, navigate pages, find supported text, and prepare drafts. Device and scan limitations apply.",
+        "citations": []
+      },
+      "raw": "{\"kind\":\"reply\",\"text\":\"EzFiles can read PDFs, navigate pages, find supported text, and prepare drafts. Device and scan limitations apply.\",\"citations\":[]}",
+      "exact_match": false
+    },
+    {
+      "id": "domain_test:domain_help_latest:0",
+      "turn": 3,
+      "family": "domain_help_latest",
+      "expected": {
+        "kind": "reply",
+        "text": "I'll look for resumes and compare available modification dates. A recently opened file or a filename containing final does not necessarily identify the latest version.",
+        "citations": []
+      },
+      "contract_valid": true,
+      "contract_error": null,
+      "prediction": {
+        "kind": "reply",
+        "text": "I focus on files and EzFiles. I can help find a resume or explain its contents.",
+        "citations": []
+      },
+      "raw": "{\"kind\":\"reply\",\"text\":\"I focus on files and EzFiles. I can help find a resume or explain its contents.\",\"citations\":[]}",
+      "exact_match": false
+    },
+    {
+      "id": "domain_test:domain_help_excel:1",
+      "turn": 3,
+      "family": "domain_help_excel",
+      "expected": {
+        "kind": "reply",
+        "text": "Yes. Supported Excel files show sheets, formatting and cached values. XLSX cells can be edited into a new Save As file; formulas are not recalculated.",
+        "citations": []
+      },
+      "contract_valid": true,
+      "contract_error": null,
+      "prediction": {
+        "kind": "reply",
+        "text": "Yes, supported Excel files can be opened with their original format. Device and layout restrictions apply.",
+        "citations": []
+      },
+      "raw": "{\"kind\":\"reply\",\"text\":\"Yes, supported Excel files can be opened with their original format. Device and layout restrictions apply.\",\"citations\":[]}",
+      "exact_match": false
+    }
+  ]
+}

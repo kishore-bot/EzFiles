@@ -1,0 +1,6 @@
+{
+  "examples": 40,
+  "tool_cases": 32,
+  "sha256": "e44914cdbaab4a2d9edc320c662f1eb80131897a2c13532ae003792b89238aed",
+  "usage": "Never train on or select checkpoints with this set; evaluate once after selection. Authored synthetic text, not speech/device certification."
+}

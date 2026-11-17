@@ -1,0 +1,14 @@
+{
+  "domain_train": {
+    "rows": 744,
+    "sha256": "0e4462b88e40ae6ad42abfb4b1b3087a7573141126fd82ef2771ee0e187f164f"
+  },
+  "domain_validation": {
+    "rows": 142,
+    "sha256": "a85f206cf37b3d6245e1d7d3fecd8ab3c98f17f7c7801d2d12c13ba06bf04453"
+  },
+  "domain_test": {
+    "rows": 102,
+    "sha256": "f6e5ecfd8a5078f28d6c17f97100e9e6a224eff1996980862bf228cf781f171f"
+  }
+}

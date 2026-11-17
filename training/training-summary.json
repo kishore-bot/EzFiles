@@ -1,0 +1,164 @@
+{
+  "status": "domain_focused_quantized_development_model",
+  "latest_adapter": "runs/fily-domain-v4",
+  "training": {
+    "v1": {
+      "device": "NVIDIA GeForce RTX 2050",
+      "steps": 798,
+      "training_examples": 3190,
+      "baseline_validation_loss": 0.9292350158095359,
+      "final_validation_loss": 0.042181050866376704,
+      "elapsed_seconds": 1329.91,
+      "peak_allocated_MiB": 1566.8,
+      "base_model_sha256": "1c9c77a4471a7f590f85240f74ed1fc26df7fbde88c3006724e2f93ca993ea4e",
+      "adapter_bytes": 12017104,
+      "adapter_sha256": "f9028e13361fbfa9d9320ea570be8ed8fb1b1898ba75cc56075380f616d47978"
+    },
+    "v2": {
+      "device": "NVIDIA GeForce RTX 2050",
+      "steps": 335,
+      "training_examples": 1337,
+      "baseline_validation_loss": 1.2898869094683916,
+      "final_validation_loss": 0.005774041717059129,
+      "elapsed_seconds": 614.05,
+      "peak_allocated_MiB": 1562.8,
+      "base_model_sha256": "1c9c77a4471a7f590f85240f74ed1fc26df7fbde88c3006724e2f93ca993ea4e",
+      "adapter_bytes": 12017104,
+      "adapter_sha256": "5c978276018a87b0744d0b15c0b82864c14ded5ae3ecf4e76a808be749d86417"
+    }
+  },
+  "evaluation": {
+    "baseline-evaluation.json": {
+      "adapter": null,
+      "examples": 30,
+      "valid_json": 8,
+      "exact_matches": 1,
+      "tool_examples": 21,
+      "tool_exact_matches": 1,
+      "note": "Exact wording is strict for replies; inspect raw answers for grounded paraphrases. Teacher-forced history, not autonomous rollouts or speech."
+    },
+    "trained-evaluation.json": {
+      "adapter": "runs/fily-lora-v1",
+      "suite": "test",
+      "examples": 30,
+      "valid_json": 30,
+      "contract_valid": 30,
+      "exact_matches": 30,
+      "tool_examples": 21,
+      "tool_exact_matches": 21,
+      "note": "Exact wording is strict for replies; inspect raw answers for grounded paraphrases. Teacher-forced history, not autonomous rollouts or speech."
+    },
+    "challenge-evaluation.json": {
+      "adapter": "runs/fily-lora-v1",
+      "suite": "challenge",
+      "examples": 33,
+      "valid_json": 32,
+      "contract_valid": 29,
+      "exact_matches": 12,
+      "tool_examples": 16,
+      "tool_exact_matches": 12,
+      "note": "Exact wording is strict for replies; inspect raw answers for grounded paraphrases. Teacher-forced history, not autonomous rollouts or speech."
+    },
+    "trained-evaluation-v2.json": {
+      "adapter": "runs/fily-lora-v2",
+      "suite": "test",
+      "examples": 30,
+      "valid_json": 30,
+      "contract_valid": 30,
+      "exact_matches": 30,
+      "tool_examples": 21,
+      "tool_exact_matches": 21,
+      "note": "Exact wording is strict for replies; inspect raw answers for grounded paraphrases. Teacher-forced history, not autonomous rollouts or speech."
+    },
+    "challenge-evaluation-v2.json": {
+      "adapter": "runs/fily-lora-v2",
+      "suite": "challenge",
+      "examples": 33,
+      "valid_json": 31,
+      "contract_valid": 29,
+      "exact_matches": 15,
+      "tool_examples": 16,
+      "tool_exact_matches": 15,
+      "note": "Exact wording is strict for replies; inspect raw answers for grounded paraphrases. Teacher-forced history, not autonomous rollouts or speech."
+    },
+    "acceptance-evaluation-v2.json": {
+      "adapter": "runs/fily-lora-v2",
+      "suite": "acceptance",
+      "examples": 20,
+      "valid_json": 20,
+      "contract_valid": 19,
+      "exact_matches": 8,
+      "tool_examples": 11,
+      "tool_exact_matches": 8,
+      "note": "Exact wording is strict for replies; inspect raw answers for grounded paraphrases. Teacher-forced history, not autonomous rollouts or speech."
+    }
+  },
+  "unique_training_conversations": 3034,
+  "application_source_changed_by_this_task": false,
+  "latest_export": "exports/fily-domain-v4",
+  "default_quantization": "Q8_0",
+  "small_fast_quantization": "Q4_K_M-I",
+  "quantized_quality": {
+    "F16": {
+      "model": "exports/fily-domain-v4/Fily-EzFiles-350M-F16.gguf",
+      "suite": "quant_compare",
+      "constrained": true,
+      "constraint_scope": "envelope_and_tool_name; arguments validated after decoding",
+      "examples": 45,
+      "valid_json": 45,
+      "contract_valid": 45,
+      "exact_matches": 43,
+      "tool_examples": 7,
+      "tool_exact_matches": 7,
+      "format_examples": 14,
+      "format_extensions_exact": 14,
+      "note": "Local Windows CPU; synthetic supplied histories; schema constraints cannot guarantee semantic accuracy; no tool execution or phone test."
+    },
+    "Q8_0": {
+      "model": "exports/fily-domain-v4/Fily-EzFiles-350M-Q8_0.gguf",
+      "suite": "quant_compare",
+      "constrained": true,
+      "constraint_scope": "envelope_and_tool_name; arguments validated after decoding",
+      "examples": 45,
+      "valid_json": 45,
+      "contract_valid": 45,
+      "exact_matches": 43,
+      "tool_examples": 7,
+      "tool_exact_matches": 7,
+      "format_examples": 14,
+      "format_extensions_exact": 14,
+      "note": "Local Windows CPU; synthetic supplied histories; schema constraints cannot guarantee semantic accuracy; no tool execution or phone test."
+    },
+    "Q4_K_M-I": {
+      "model": "exports/fily-domain-v4/Fily-EzFiles-350M-Q4_K_M-I.gguf",
+      "suite": "quant_compare",
+      "constrained": true,
+      "constraint_scope": "envelope_and_tool_name; arguments validated after decoding",
+      "examples": 45,
+      "valid_json": 45,
+      "contract_valid": 45,
+      "exact_matches": 39,
+      "tool_examples": 7,
+      "tool_exact_matches": 7,
+      "format_examples": 14,
+      "format_extensions_exact": 13,
+      "note": "Local Windows CPU; synthetic supplied histories; schema constraints cannot guarantee semantic accuracy; no tool execution or phone test."
+    },
+    "Q4_0": {
+      "model": "exports/fily-domain-v4/Fily-EzFiles-350M-Q4_0.gguf",
+      "suite": "quant_compare",
+      "constrained": true,
+      "constraint_scope": "envelope_and_tool_name; arguments validated after decoding",
+      "examples": 45,
+      "valid_json": 45,
+      "contract_valid": 40,
+      "exact_matches": 19,
+      "tool_examples": 7,
+      "tool_exact_matches": 3,
+      "format_examples": 14,
+      "format_extensions_exact": 13,
+      "note": "Local Windows CPU; synthetic supplied histories; schema constraints cannot guarantee semantic accuracy; no tool execution or phone test."
+    }
+  },
+  "phone_benchmark": false
+}

@@ -28,7 +28,11 @@ import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.ezfiles.reader.domain.CodeFold
+import com.ezfiles.reader.domain.CodeFolding
 import com.ezfiles.reader.domain.ContentBlock
+import com.ezfiles.reader.domain.FoldKind
+import androidx.compose.foundation.shape.RoundedCornerShape
 import com.ezfiles.reader.presentation.ReaderUiState
 
 private data class CodeBookColors(
@@ -54,8 +58,6 @@ private val LightBookColors = CodeBookColors(
     foldIndicator = Color(0xFF0065A9),
     foldedSuffix = Color(0xFFAAAAAA),
 )
-
-private data class FoldRegion(val startLine: Int, val endLine: Int)
 
 @Composable
 fun CodeBookViewer(state: ReaderUiState.Ready, onLoadMore: () -> Unit, onRetry: () -> Unit, darkReading: Boolean = true) {
@@ -100,20 +102,22 @@ fun CodeBookViewer(state: ReaderUiState.Ready, onLoadMore: () -> Unit, onRetry: 
         }
     }
 
-    val foldRegions = remember(lines) { detectFoldRegions(lines) }
-    val foldStarts = remember(foldRegions) { foldRegions.associateBy { it.startLine } }
-    val collapsed = remember { mutableStateMapOf<Int, Boolean>() }
+    // IntelliJ-style folding: imports start collapsed, everything else open.
+    val extension = remember(state.ref) { state.ref.displayName.substringAfterLast('.', "").lowercase() }
+    val folds = remember(lines, extension) { CodeFolding.regions(lines, extension) }
+    val foldStarts = remember(folds) { folds.associateBy { it.start } }
+    val toggled = remember(state.ref) { mutableStateMapOf<Int, Boolean>() }
+    fun isCollapsed(fold: CodeFold) = toggled[fold.start] ?: (fold.kind == FoldKind.Imports)
 
-    val visibleLines = remember(lines.size, collapsed.toMap()) {
-        val hidden = mutableSetOf<Int>()
-        for ((startLine, isCollapsed) in collapsed) {
-            if (isCollapsed) {
-                val region = foldStarts[startLine] ?: continue
-                for (line in (region.startLine + 1)..region.endLine) hidden.add(line)
-            }
+    val visibleLines = remember(lines.size, folds, toggled.toMap()) {
+        val hidden = BooleanArray(lines.size)
+        for (fold in folds) {
+            if (!isCollapsed(fold) || hidden[fold.start]) continue
+            for (line in (fold.start + 1)..fold.lastHidden.coerceAtMost(lines.size - 1)) hidden[line] = true
         }
-        lines.indices.filter { it !in hidden }
+        lines.indices.filter { !hidden[it] }
     }
+    val anyOpen = folds.any { !isCollapsed(it) }
 
     val style = MaterialTheme.typography.bodyMedium.copy(
         fontFamily = FontFamily.Monospace,
@@ -123,87 +127,71 @@ fun CodeBookViewer(state: ReaderUiState.Ready, onLoadMore: () -> Unit, onRetry: 
     )
     val gutterStyle = style.copy(color = theme.gutter)
     val gutterWidth = "${lines.size}".length
-    val gutterChars = gutterWidth + 2
 
     Box(Modifier.fillMaxSize().background(theme.background)) {
         LazyColumn(
             state = listState,
-            contentPadding = PaddingValues(vertical = 24.dp),
+            contentPadding = PaddingValues(top = if (folds.isEmpty()) 24.dp else 56.dp, bottom = 24.dp),
             modifier = Modifier.fillMaxWidth(),
         ) {
             items(visibleLines.size, key = { visibleLines[it] }) { idx ->
                 val lineIndex = visibleLines[idx]
                 val fold = foldStarts[lineIndex]
-                val isCollapsed = collapsed[lineIndex] == true
+                val collapsed = fold != null && isCollapsed(fold)
+                val toggle = { if (fold != null) toggled[fold.start] = !collapsed }
                 Row(
                     Modifier
                         .fillMaxWidth()
                         .horizontalScroll(rememberScrollState())
-                        .padding(start = 20.dp, end = 20.dp),
+                        .padding(end = 20.dp),
+                    verticalAlignment = Alignment.CenterVertically,
                 ) {
-                    // Gutter: line number + fold indicator
+                    Text(
+                        "${lineIndex + 1}".padStart(gutterWidth),
+                        style = gutterStyle,
+                        modifier = Modifier.padding(start = 12.dp),
+                    )
+                    // The fold arrow: a full-height touch target, like the IDE gutter.
                     Box(
                         Modifier
-                            .width((gutterChars * 9).dp)
-                            .then(if (fold != null) Modifier.clickable {
-                                collapsed[lineIndex] = !isCollapsed
-                            } else Modifier),
-                        contentAlignment = Alignment.CenterEnd,
+                            .width(32.dp)
+                            .then(if (fold != null) Modifier.clickable(onClick = toggle) else Modifier),
+                        contentAlignment = Alignment.Center,
                     ) {
-                        val gutterText = buildAnnotatedString {
-                            if (fold != null) {
-                                withStyle(SpanStyle(color = theme.foldIndicator)) {
-                                    append(if (isCollapsed) "▶" else "▼")
-                                }
-                                append(" ")
-                            }
-                            withStyle(SpanStyle(color = theme.gutter)) {
-                                append("${lineIndex + 1}".padStart(gutterWidth))
-                            }
-                        }
-                        Text(gutterText, style = gutterStyle, modifier = Modifier.padding(end = 12.dp))
+                        if (fold != null) Text(if (collapsed) "▸" else "▾", style = gutterStyle.copy(color = theme.foldIndicator))
                     }
-                    // Code content
-                    if (isCollapsed && fold != null) {
-                        val lineText = highlightedLines?.getOrNull(lineIndex)
-                        val collapsedText = buildAnnotatedString {
-                            if (lineText != null) append(lineText) else append(lines[lineIndex])
-                            withStyle(SpanStyle(color = theme.foldedSuffix)) {
-                                append("  ...  }")
-                            }
-                        }
-                        Text(collapsedText, style = style)
+                    val lineText: AnnotatedString = highlightedLines?.getOrNull(lineIndex) ?: AnnotatedString(lines[lineIndex])
+                    if (collapsed && fold != null) {
+                        // Tapping the placeholder opens the fold, as clicking it does in the IDE.
+                        Text(
+                            buildAnnotatedString {
+                                append(lineText)
+                                withStyle(SpanStyle(color = theme.foldIndicator, background = theme.foldIndicator.copy(alpha = 0.12f))) {
+                                    append(CodeFolding.placeholder(fold, lines))
+                                }
+                            },
+                            style = style,
+                            modifier = Modifier.clickable(onClick = toggle),
+                        )
                     } else {
-                        val lineText = highlightedLines?.getOrNull(lineIndex)
-                        if (lineText != null) {
-                            Text(lineText, style = style)
-                        } else {
-                            Text(lines[lineIndex], style = style)
-                        }
+                        Text(lineText, style = style)
                     }
                 }
             }
             item(key = "footer") { DocumentFooter(state, onRetry) }
         }
-    }
-}
-
-private fun detectFoldRegions(lines: List<String>): List<FoldRegion> {
-    val regions = mutableListOf<FoldRegion>()
-    val braceStack = mutableListOf<Int>()
-    for (i in lines.indices) {
-        val line = lines[i]
-        for (ch in line) {
-            when (ch) {
-                '{' -> braceStack.add(i)
-                '}' -> if (braceStack.isNotEmpty()) {
-                    val start = braceStack.removeLast()
-                    if (i - start >= 2) {
-                        regions.add(FoldRegion(start, i))
-                    }
-                }
-            }
+        if (folds.isNotEmpty()) {
+            Text(
+                if (anyOpen) "Collapse all" else "Expand all",
+                style = MaterialTheme.typography.labelLarge,
+                color = theme.foldIndicator,
+                modifier = Modifier
+                    .align(Alignment.TopEnd)
+                    .padding(top = 10.dp, end = 12.dp)
+                    .background(theme.background.copy(alpha = 0.92f), RoundedCornerShape(50))
+                    .clickable { folds.forEach { toggled[it.start] = anyOpen } }
+                    .padding(horizontal = 14.dp, vertical = 8.dp),
+            )
         }
     }
-    return regions
 }

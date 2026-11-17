@@ -40,6 +40,11 @@ class ToolExecutor(
 
     fun alias(documentId: String): String = ids.alias(documentId)
 
+    /** File names by short ID, from results Fily has seen; for spoken replies. */
+    private val names = HashMap<String, String>()
+
+    fun nameOf(alias: String): String? = names[alias]
+
     suspend fun execute(name: String, args: JsonObject?): String {
         val arguments = ids.resolveArguments(args ?: JsonObject(emptyMap()))
         return try {
@@ -125,7 +130,7 @@ class ToolExecutor(
     private fun documents(results: AssistantDocumentResults): String = buildJsonObject {
         put("documents", JsonArray(results.documents.map { doc ->
             buildJsonObject {
-                put("id", ids.alias(doc.id))
+                put("id", ids.alias(doc.id).also { names[it] = doc.name })
                 put("name", doc.name)
             }
         }))
@@ -187,8 +192,15 @@ class ToolExecutor(
         }.toString()
     }
 
-    private suspend fun openDocument(id: String): String =
-        handoff("opened", { put("documentId", ids.alias(id)) }) { AssistantDestination(actions.resolveDocument(id), AssistantAction.Open, it) }
+    private suspend fun openDocument(id: String): String {
+        var alias = ids.alias(id)
+        return handoff("opened", { put("documentId", alias) }) { authorization ->
+            val ref = actions.resolveDocument(id)
+            // A name the model made up resolves to a real file: report that file's own ID.
+            alias = ids.alias(actions.documentId(ref)).also { names[it] = ref.displayName }
+            AssistantDestination(ref, AssistantAction.Open, authorization)
+        }
+    }
 
     private suspend fun documentHandoff(id: String, action: AssistantAction, status: String): String =
         handoff(status, { put("documentId", ids.alias(id)) }) { AssistantDestination(actions.resolveDocument(id), action, it) }

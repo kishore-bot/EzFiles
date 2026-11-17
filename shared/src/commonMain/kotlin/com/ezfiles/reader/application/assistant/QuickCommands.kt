@@ -118,6 +118,22 @@ object QuickCommands {
         return sections.entries.firstOrNull { (_, names) -> words in names.split('|') }?.key
     }
 
+    private val choice = Regex("""^(the |that )?(first|second|third|fourth|fifth|last|top|\d+(?:st|nd|rd|th)|number (\w+))( one| file| document)?$""")
+
+    /** An answer to "Which one?": "the second one", "the last", "number 2". */
+    fun choicePosition(request: String): Int? {
+        val text = request.lowercase().replace(Regex("""[^a-z0-9 ]"""), " ").replace(Regex(" +"), " ").trim().replace(filler, "").trim()
+        val m = choice.matchEntire(text) ?: return null
+        val which = m.groupValues[2]
+        return when {
+            which == "last" -> -1
+            which == "top" -> 0
+            m.groupValues[3].isNotEmpty() -> spokenNumber(m.groupValues[3])?.minus(1)
+            which[0].isDigit() -> which.takeWhile(Char::isDigit).toIntOrNull()?.minus(1)
+            else -> ordinals.indexOf(which)
+        }?.takeIf { it >= -1 }
+    }
+
     /** What Fily says after a quick command, from the controlReader result. */
     fun reply(command: QuickCommand, page: Int?, pageCount: Int?, sheet: String?, cell: String?, failure: String?): String {
         if (failure != null) return when (failure) {

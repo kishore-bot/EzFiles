@@ -15,9 +15,8 @@ import android.net.Uri
 import java.security.MessageDigest
 import kotlinx.coroutines.withContext
 import com.ezfiles.reader.data.RustGlanceEngine
-import kotlinx.coroutines.DelicateCoroutinesApi
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.GlobalScope
 import kotlinx.coroutines.IO
 import kotlinx.coroutines.asCoroutineDispatcher
 import com.ezfiles.reader.data.EngineDocumentText
@@ -51,12 +50,24 @@ import java.io.File
 import java.util.concurrent.Executors
 
 /** Entry point for `androidApp`: the object graph for this process. */
-fun androidAppDependencies(context: Context, assistantAccess: AssistantAccess = androidAssistantAccess(context)): AppDependencies {
+fun androidAppDependencies(
+    context: Context,
+    applicationScope: CoroutineScope,
+    assistantAccess: AssistantAccess = androidAssistantAccess(context),
+): AppDependencies {
     android.os.Trace.beginSection("EzFiles.dependencies")
-    return try { createAndroidAppDependencies(context, assistantAccess) } finally { android.os.Trace.endSection() }
+    return try {
+        createAndroidAppDependencies(context, applicationScope, assistantAccess)
+    } finally {
+        android.os.Trace.endSection()
+    }
 }
 
-private fun createAndroidAppDependencies(context: Context, assistantAccess: AssistantAccess): AppDependencies {
+private fun createAndroidAppDependencies(
+    context: Context,
+    applicationScope: CoroutineScope,
+    assistantAccess: AssistantAccess,
+): AppDependencies {
     val app = context.applicationContext
     val preferences = app.getSharedPreferences("ezfiles", Context.MODE_PRIVATE)
     val storage = object : KeyValueStorage {
@@ -78,8 +89,7 @@ private fun createAndroidAppDependencies(context: Context, assistantAccess: Assi
     val access = AndroidDocumentAccess.get(app)
     val reader = RustDocumentReader(access)
     // The library loads while the first screen draws, not when the first file opens.
-    @OptIn(DelicateCoroutinesApi::class)
-    reader.warmUp(GlobalScope)
+    reader.warmUp(applicationScope)
     val device = ChosenFolderDocuments(storage, AndroidDocumentTrees(app), scanCache = FileKeyValueStorage(File(app.cacheDir, "library")))
     val pdf = AndroidPdfOpener(app)
     // Search: one background thread at the lowest priority reads files for the index, so it never

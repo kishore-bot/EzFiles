@@ -1,6 +1,8 @@
 package com.ezfiles.reader.application.assistant
 
 import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.contentOrNull
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.add
@@ -106,7 +108,7 @@ class FilySession(
                 remember(exchange)
                 return if (response.kind == "tool") "I couldn't finish that. Try asking another way." else spokenTextFor(response)
             }
-            val result = if (toolName in toolNames) tools.execute(toolName, response.toolArgs) else UNOFFERED_TOOL
+            val result = if (toolName in toolNames) tools.execute(toolName, withOpenFile(response.toolArgs, screen)) else UNOFFERED_TOOL
             log("Tool $toolName -> ${result.take(300)}")
             exchange += FilyTurn(FilyRole.Tool, result)
             // Action results get a fixed, accurate sentence; only content answers go back to the model.
@@ -129,6 +131,14 @@ class FilySession(
             }
         }
         error("unreachable")
+    }
+
+    /** A blank document ID ("what does page 2 say" with a PDF open) means the open file. */
+    private fun withOpenFile(args: JsonObject?, screen: FilyScreen): JsonObject? {
+        val open = screen.selectedDocumentId ?: return args
+        val id = (args?.get("documentId") as? JsonPrimitive)?.contentOrNull
+        if (args == null || !args.containsKey("documentId") || !id.isNullOrBlank()) return args
+        return JsonObject(args + ("documentId" to JsonPrimitive(open)))
     }
 
     private fun finish(exchange: MutableList<FilyTurn>, say: AfterTool.Say): String {
@@ -237,11 +247,27 @@ class FilySession(
     }
 
     private fun remember(exchange: List<FilyTurn>) {
-        history += exchange.toList()
+        history += exchange.map(::compact)
         while (history.size > MAX_HISTORY_EXCHANGES) history.removeAt(0)
     }
 
+    /**
+     * Earlier passages stay in history only as a short head: the answer that used them is already
+     * there, and two full excerpts would overflow the model's context ("what does page 2 say" after
+     * two questions) and slow every later request.
+     */
+    private fun compact(turn: FilyTurn): FilyTurn {
+        if (turn.role != FilyRole.Tool || turn.content.length <= MAX_HISTORY_TOOL_CHARS) return turn
+        val json = runCatching { Json.parseToJsonElement(turn.content).jsonObject }.getOrNull() ?: return turn
+        val text = (json["text"] as? JsonPrimitive)?.contentOrNull ?: return turn
+        if (text.length <= MAX_HISTORY_TEXT_CHARS) return turn
+        val shorter = JsonObject(json + ("text" to JsonPrimitive(text.take(MAX_HISTORY_TEXT_CHARS).trimEnd() + "…")) + ("truncated" to JsonPrimitive(true)))
+        return FilyTurn(turn.role, shorter.toString())
+    }
+
     private companion object {
+        const val MAX_HISTORY_TOOL_CHARS = 400
+        const val MAX_HISTORY_TEXT_CHARS = 200
         const val MAX_TOOL_STEPS = 3
         const val MAX_HISTORY_EXCHANGES = 2
         const val UNOFFERED_TOOL = """{"status":"failed","reason":"unsupported_tool"}"""

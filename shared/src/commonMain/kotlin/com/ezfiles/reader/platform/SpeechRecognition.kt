@@ -1,11 +1,12 @@
 package com.ezfiles.reader.platform
 
-import com.ezfiles.reader.data.KeyValueStorage
-import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
-import kotlinx.coroutines.flow.asStateFlow
 
-enum class SpeechState { Idle, Listening, Error }
+/**
+ * [NeedsLanguage]: the phone's offline recognizer has no English installed yet; [SpeechRecognition.downloadLanguage]
+ * asks the phone to download it.
+ */
+enum class SpeechState { Idle, Listening, Error, NeedsLanguage }
 
 expect class SpeechRecognition {
     val state: StateFlow<SpeechState>
@@ -14,35 +15,9 @@ expect class SpeechRecognition {
     fun start()
     fun stop()
     fun cancel()
-}
 
-/** Which on-device recognizer listens. Both stay on the phone. */
-enum class SpeechEngine(val label: String, internal val stored: String) {
-    /** The phone's own on-device recognizer, biased towards file names and commands. */
-    System("Android", "system"),
-    /** Moonshine Base (English) through sherpa-onnx; needs its model files on the phone. */
-    Moonshine("Moonshine", "moonshine"),
-    ;
-
-    companion object {
-        fun fromStored(value: String?): SpeechEngine = entries.firstOrNull { it.stored == value } ?: System
-    }
-}
-
-/** The speech engine setting, persisted like the theme. */
-internal class SpeechSettings(private val storage: KeyValueStorage) {
-    private val state = MutableStateFlow(SpeechEngine.fromStored(storage.get(KEY)))
-    val engine: StateFlow<SpeechEngine> = state.asStateFlow()
-
-    fun set(value: SpeechEngine) {
-        if (value == state.value) return
-        state.value = value
-        storage.put(KEY, value.stored)
-    }
-
-    private companion object {
-        const val KEY = "speech_engine_v1"
-    }
+    /** Asks the phone to download its offline English speech pack (the system shows its own prompt). */
+    fun downloadLanguage()
 }
 
 /** [alternatives] are the recognizer's guesses, best first; [text] is the first. */
@@ -55,6 +30,5 @@ class SpeechResult(val text: String, val isFinal: Boolean, val alternatives: Lis
 @androidx.compose.runtime.Composable
 expect fun rememberSpeechRecognition(
     hints: () -> List<String>,
-    engine: SpeechEngine = SpeechEngine.System,
     onResult: (SpeechResult) -> Unit,
 ): SpeechRecognition

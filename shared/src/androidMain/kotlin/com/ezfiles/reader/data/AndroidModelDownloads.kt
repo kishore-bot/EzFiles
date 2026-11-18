@@ -38,6 +38,11 @@ internal class AndroidModelDownloads(context: Context) : ModelDownloads {
     private val states = AssistantModel.entries.associateWith { MutableStateFlow(if (folder(it) != null) ModelInstall.Installed else ModelInstall.Missing) }
     private val jobs = HashMap<AssistantModel, Job>()
 
+    init {
+        // The Moonshine speech model of earlier versions is no longer used: give its space back.
+        scope.launch { File(root, "moonshine-base-en").deleteRecursively() }
+    }
+
     override fun state(model: AssistantModel): StateFlow<ModelInstall> = states.getValue(model).asStateFlow()
 
     /** The private copy, else a developer's copy pushed with adb (`/data/local/tmp`), if complete. */
@@ -46,7 +51,6 @@ internal class AndroidModelDownloads(context: Context) : ModelDownloads {
 
     private fun devDir(model: AssistantModel) = when (model) {
         AssistantModel.Fily -> File("/data/local/tmp")
-        AssistantModel.Moonshine -> File("/data/local/tmp/moonshine-base-en")
     }
 
     override fun download(model: AssistantModel) = run(model) {

@@ -1,6 +1,5 @@
 package com.ezfiles.reader.presentation.about
 
-import com.ezfiles.reader.platform.SpeechEngine
 
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
@@ -94,9 +93,6 @@ fun AboutPages(
     onAssistantChange: (Boolean) -> Unit = {},
     contentEnabled: Boolean = false,
     onContentChange: (Boolean) -> Unit = {},
-    /** Null hides the speech engine choice (no setting on this platform). */
-    speechEngine: SpeechEngine? = null,
-    onSpeechEngineChange: (SpeechEngine) -> Unit = {},
 ) {
     val back = { onRouteChange(if (route == AboutRoute.VisionFromAbout) AboutRoute.About else null) }
     PlatformBackHandler(enabled = true, onBack = back)
@@ -114,8 +110,6 @@ fun AboutPages(
             onAssistantChange = onAssistantChange,
             contentEnabled = contentEnabled,
             onContentChange = onContentChange,
-            speechEngine = speechEngine,
-            onSpeechEngineChange = onSpeechEngineChange,
         )
         AboutRoute.Vision, AboutRoute.VisionFromAbout -> VisionScreen(onBack = back)
     }
@@ -257,9 +251,6 @@ fun AboutScreen(
     onAssistantChange: (Boolean) -> Unit = {},
     contentEnabled: Boolean = false,
     onContentChange: (Boolean) -> Unit = {},
-    /** Null hides the speech engine choice (no setting on this platform). */
-    speechEngine: SpeechEngine? = null,
-    onSpeechEngineChange: (SpeechEngine) -> Unit = {},
 ) {
     val appInfo = LocalAppInfo.current
     var showingLicences by rememberSaveable { mutableStateOf(false) }
@@ -267,8 +258,7 @@ fun AboutScreen(
     AboutFrame("About EzFiles", onBack) {
         AppHeader()
         Spacer(Modifier.height(20.dp))
-        AppearanceCard(theme, onThemeChange, haptics, onHapticsChange, assistantEnabled, onAssistantChange, contentEnabled, onContentChange,
-            speechEngine, onSpeechEngineChange)
+        AppearanceCard(theme, onThemeChange, haptics, onHapticsChange, assistantEnabled, onAssistantChange, contentEnabled, onContentChange)
         Spacer(Modifier.height(12.dp))
         NavigationCard(
             icon = AboutIcons.Heart,
@@ -396,8 +386,6 @@ private fun AppearanceCard(
     onAssistantChange: (Boolean) -> Unit,
     contentEnabled: Boolean,
     onContentChange: (Boolean) -> Unit,
-    speechEngine: SpeechEngine?,
-    onSpeechEngineChange: (SpeechEngine) -> Unit,
 ) {
     Column(
         Modifier.fillMaxWidth().glass(EzShapes.Card, 0.55f).padding(16.dp),
@@ -418,38 +406,19 @@ private fun AppearanceCard(
             onCheckedChange = onHapticsChange,
         )
         EzSwitchRow(
-            title = "Assistant access",
-            body = "Let the local voice assistant or compatible system assistants find files you add to EzFiles and request actions. Off blocks all assistant access to your documents.",
+            title = "Fily and assistants",
+            body = "Lets Fily, the voice assistant on this phone, and assistants built into Android find your files and open, share or print them when you ask. Off turns Fily off and no assistant can see your files.",
             checked = assistantEnabled,
             onCheckedChange = onAssistantChange,
         )
         if (assistantEnabled) {
             EzSwitchRow(
-                title = "Share document text with assistants",
-                body = "Also allow bounded excerpts and text matches. Otherwise only filenames and basic metadata are shared. Assistant privacy settings apply; EzFiles still works offline.",
+                title = "Let them read inside files",
+                body = "Needed to answer questions about a document, like the total on a bill. Off: only file names, sizes and dates. Nothing leaves your phone.",
                 checked = contentEnabled,
                 onCheckedChange = onContentChange,
             )
             com.ezfiles.reader.presentation.assistant.ModelInstallRow(com.ezfiles.reader.application.assistant.AssistantModel.Fily)
-            if (speechEngine != null) {
-                Text("Speech recognition", style = MaterialTheme.typography.bodyLarge, color = EzColors.Text)
-                Text(
-                    if (speechEngine == SpeechEngine.Moonshine) "Moonshine Base, English only, on this device. Listens until you pause, then reads it all at once."
-                    else "The phone's own on-device recognizer, tuned towards your file names and Fily's commands.",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = EzColors.TextSecondary,
-                )
-                EzSegmented(
-                    options = SpeechEngine.entries,
-                    selected = speechEngine,
-                    label = { it.label },
-                    onSelect = onSpeechEngineChange,
-                    modifier = Modifier.fillMaxWidth(),
-                )
-                if (speechEngine == SpeechEngine.Moonshine) {
-                    com.ezfiles.reader.presentation.assistant.ModelInstallRow(com.ezfiles.reader.application.assistant.AssistantModel.Moonshine)
-                }
-            }
         }
     }
 }

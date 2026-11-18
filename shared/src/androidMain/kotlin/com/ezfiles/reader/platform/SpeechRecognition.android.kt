@@ -5,9 +5,12 @@ import android.content.Intent
 import android.os.Build
 import android.os.Bundle
 import android.speech.RecognitionListener
+import android.speech.RecognitionSupport
+import android.speech.RecognitionSupportCallback
 import android.speech.RecognizerIntent
 import android.speech.SpeechRecognizer
 import android.util.Log
+import androidx.annotation.RequiresApi
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.getValue
@@ -21,7 +24,6 @@ import java.util.Locale
 actual class SpeechRecognition(
     private val context: Context,
     private val hints: () -> List<String>,
-    private val engine: SpeechEngine,
     private val onResult: (SpeechResult) -> Unit,
 ) {
     private val _state = MutableStateFlow(SpeechState.Idle)
@@ -30,6 +32,14 @@ actual class SpeechRecognition(
     actual val level: StateFlow<Float> = _level
 
     private var recognizer: SpeechRecognizer? = null
+    /** Kept alive while the system downloads a language pack for us. */
+    private var downloader: SpeechRecognizer? = null
+
+    /**
+     * The English the offline recognizer has installed (the phone's own English if it is there,
+     * else any English: en-US, en-GB, en-IN…). Null until checked.
+     */
+    private var language: String? = null
 
     /**
      * The system's default recognizer may stream audio to a server. EzFiles is offline, so the
@@ -39,24 +49,57 @@ actual class SpeechRecognition(
     private val onDevice: Boolean
         get() = Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU && SpeechRecognizer.isOnDeviceRecognitionAvailable(context)
 
-    private val main = android.os.Handler(android.os.Looper.getMainLooper())
-    private var moonshine: Thread? = null
-    /** Each Moonshine session's number; cancel() and a new start() make older ones stale. */
-    @Volatile private var moonshineSession = 0
-    @Volatile private var moonshineFinish = false
-
     actual fun start() {
         cancel()
-        if (engine == SpeechEngine.Moonshine) {
-            if (MoonshineSpeech.available()) return startMoonshine()
-            Log.w(TAG, "Moonshine model not installed; using the Android recognizer")
-        }
         val local = onDevice
         if (!local && !SpeechRecognizer.isRecognitionAvailable(context)) {
             _state.value = SpeechState.Error
             return
         }
         val sr = if (local) SpeechRecognizer.createOnDeviceSpeechRecognizer(context) else SpeechRecognizer.createSpeechRecognizer(context)
+        recognizer = sr
+        // Listening from now on, so the overlay doesn't start us again while the language is checked.
+        _state.value = SpeechState.Listening
+        if (local && language == null && Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            checkLanguage(sr)
+        } else {
+            listen(sr, local)
+        }
+    }
+
+    /** Finds an installed English before the first session; with none, asks for a download instead of failing silently. */
+    @RequiresApi(Build.VERSION_CODES.TIRAMISU)
+    private fun checkLanguage(sr: SpeechRecognizer) {
+        val callback = object : RecognitionSupportCallback {
+            override fun onSupportResult(support: RecognitionSupport) {
+                if (recognizer !== sr) return
+                val chosen = englishIn(support)
+                Log.i(TAG, "Offline languages: installed=${support.installedOnDeviceLanguages} pending=${support.pendingOnDeviceLanguages} -> $chosen")
+                if (chosen == null) {
+                    needsLanguage()
+                } else {
+                    language = chosen
+                    listen(sr, local = true)
+                }
+            }
+
+            override fun onError(error: Int) {
+                if (recognizer !== sr) return
+                Log.w(TAG, "Language check failed ($error); trying the phone's language")
+                language = Locale.getDefault().toLanguageTag()
+                listen(sr, local = true)
+            }
+        }
+        try {
+            sr.checkRecognitionSupport(baseIntent(Locale.getDefault().toLanguageTag()), context.mainExecutor, callback)
+        } catch (e: RuntimeException) {
+            Log.w(TAG, "Language check unavailable: ${e.message}")
+            language = Locale.getDefault().toLanguageTag()
+            listen(sr, local = true)
+        }
+    }
+
+    private fun listen(sr: SpeechRecognizer, local: Boolean) {
         sr.setRecognitionListener(object : RecognitionListener {
             override fun onReadyForSpeech(params: Bundle?) { _state.value = SpeechState.Listening }
             override fun onBeginningOfSpeech() {}
@@ -65,8 +108,9 @@ actual class SpeechRecognition(
             override fun onBufferReceived(buffer: ByteArray?) {}
             override fun onEndOfSpeech() { _level.value = 0f }
             override fun onError(error: Int) {
-                Log.w(TAG, "Recognition error $error (on-device=$local)")
-                _state.value = SpeechState.Error
+                Log.w(TAG, "Recognition error $error (on-device=$local, language=$language)")
+                if (local && (error == ERROR_LANGUAGE_NOT_SUPPORTED || error == ERROR_LANGUAGE_UNAVAILABLE)) needsLanguage()
+                else _state.value = SpeechState.Error
             }
             override fun onResults(results: Bundle?) {
                 val matches = results?.getStringArrayList(SpeechRecognizer.RESULTS_RECOGNITION).orEmpty().filter(String::isNotBlank)
@@ -80,10 +124,7 @@ actual class SpeechRecognition(
             }
             override fun onEvent(eventType: Int, params: Bundle?) {}
         })
-        recognizer = sr
-        val intent = Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH).apply {
-            putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL, RecognizerIntent.LANGUAGE_MODEL_FREE_FORM)
-            putExtra(RecognizerIntent.EXTRA_LANGUAGE, Locale.getDefault().toLanguageTag())
+        val intent = baseIntent(language ?: Locale.getDefault().toLanguageTag()).apply {
             putExtra(RecognizerIntent.EXTRA_PARTIAL_RESULTS, true)
             // Several guesses: the assistant keeps the one that names a file or a command.
             putExtra(RecognizerIntent.EXTRA_MAX_RESULTS, 5)
@@ -99,68 +140,96 @@ actual class SpeechRecognition(
         _state.value = SpeechState.Listening
     }
 
-    /** One utterance with Moonshine on a background thread; results come back on the main thread. */
-    private fun startMoonshine() {
-        val mine = ++moonshineSession
-        val stale = { moonshineSession != mine }
-        moonshineFinish = false
-        // Listening from now on, so the overlay doesn't restart us while the model loads.
-        _state.value = SpeechState.Listening
-        val previous = moonshine
-        moonshine = Thread({
-            // The previous session must have released the microphone first.
-            previous?.join(2_000)
-            val text = try {
-                MoonshineSpeech.listenOnce(
-                    cancelled = stale,
-                    finish = { moonshineFinish },
-                    onListening = { main.post { if (!stale()) _state.value = SpeechState.Listening } },
-                    onLevel = { _level.value = it },
-                )
-            } catch (e: Throwable) {
-                Log.w(TAG, "Moonshine failed: ${e.message}")
-                ""
+    private fun needsLanguage() {
+        language = null
+        recognizer?.destroy()
+        recognizer = null
+        _level.value = 0f
+        _state.value = SpeechState.NeedsLanguage
+    }
+
+    actual fun downloadLanguage() {
+        language = null
+        val tag = Locale.getDefault().toLanguageTag().takeIf { it.startsWith("en", ignoreCase = true) } ?: "en-US"
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU && SpeechRecognizer.isOnDeviceRecognitionAvailable(context)) {
+            try {
+                downloader?.destroy()
+                // The system shows its own download prompt or notification for the pack.
+                downloader = SpeechRecognizer.createOnDeviceSpeechRecognizer(context).also { it.triggerModelDownload(baseIntent(tag)) }
+                _state.value = SpeechState.Idle
+                return
+            } catch (e: RuntimeException) {
+                Log.w(TAG, "Language download unavailable: ${e.message}")
             }
-            main.post {
-                if (stale() || text == null) return@post
-                Log.i(TAG, "Heard (moonshine): [$text]")
-                if (text.isNotBlank()) {
-                    onResult(SpeechResult(text, true, listOf(text)))
-                    _state.value = SpeechState.Idle
-                } else {
-                    // Silence: the overlay listens again, as after the Android recognizer's timeout.
-                    _state.value = SpeechState.Error
-                }
+        }
+        // Otherwise the phone's voice input settings, where an offline language can be added.
+        for (action in listOf(android.provider.Settings.ACTION_VOICE_INPUT_SETTINGS, android.provider.Settings.ACTION_SETTINGS)) {
+            try {
+                context.startActivity(Intent(action).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
+                break
+            } catch (_: android.content.ActivityNotFoundException) {
             }
-        }, "ez-moonshine").apply { isDaemon = true; start() }
+        }
+        _state.value = SpeechState.Idle
     }
 
     actual fun stop() {
         recognizer?.stopListening()
-        moonshineFinish = true
     }
 
     actual fun cancel() {
-        moonshineSession++
         recognizer?.cancel()
         recognizer?.destroy()
         recognizer = null
-        _state.value = SpeechState.Idle
+        if (_state.value != SpeechState.NeedsLanguage) _state.value = SpeechState.Idle
     }
 
-    fun destroy() { cancel() }
+    fun destroy() {
+        cancel()
+        downloader?.destroy()
+        downloader = null
+    }
+
+    private fun baseIntent(language: String) = Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH).apply {
+        putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL, RecognizerIntent.LANGUAGE_MODEL_FREE_FORM)
+        putExtra(RecognizerIntent.EXTRA_LANGUAGE, language)
+    }
 
     private companion object {
         const val TAG = "EzSpeech"
         const val MAX_HINTS = 100
+        // SpeechRecognizer.ERROR_LANGUAGE_NOT_SUPPORTED / ERROR_LANGUAGE_UNAVAILABLE (API 31).
+        const val ERROR_LANGUAGE_NOT_SUPPORTED = 12
+        const val ERROR_LANGUAGE_UNAVAILABLE = 13
     }
 }
 
+/**
+ * The English to listen in: the phone's own if it is installed, else any installed English.
+ * Null when the recognizer reports languages but no English among the installed ones. A
+ * recognizer that reports nothing at all is trusted with the phone's language.
+ */
+@RequiresApi(Build.VERSION_CODES.TIRAMISU)
+private fun englishIn(support: RecognitionSupport): String? {
+    val installed = support.installedOnDeviceLanguages
+    val phone = Locale.getDefault().toLanguageTag()
+    if (installed.isEmpty() && support.pendingOnDeviceLanguages.isEmpty() && support.supportedOnDeviceLanguages.isEmpty()) return phone
+    return pickEnglish(phone, installed)
+}
+
+/** [phone] if it is an installed English, else the first installed English (US first), else null. */
+internal fun pickEnglish(phone: String, installed: List<String>): String? {
+    val english = installed.filter { it.lowercase().let { tag -> tag == "en" || tag.startsWith("en-") || tag.startsWith("en_") } }
+    return english.firstOrNull { it.equals(phone, ignoreCase = true) && phone.startsWith("en", ignoreCase = true) }
+        ?: english.firstOrNull { it.equals("en-US", ignoreCase = true) }
+        ?: english.firstOrNull()
+}
+
 @Composable
-actual fun rememberSpeechRecognition(hints: () -> List<String>, engine: SpeechEngine, onResult: (SpeechResult) -> Unit): SpeechRecognition {
+actual fun rememberSpeechRecognition(hints: () -> List<String>, onResult: (SpeechResult) -> Unit): SpeechRecognition {
     val context = LocalContext.current
     val latestHints by rememberUpdatedState(hints)
-    val sr = remember(context, engine) { SpeechRecognition(context, { latestHints() }, engine, onResult) }
+    val sr = remember(context) { SpeechRecognition(context, { latestHints() }, onResult) }
     DisposableEffect(sr) { onDispose { sr.destroy() } }
     return sr
 }

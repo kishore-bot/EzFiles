@@ -64,6 +64,7 @@ import com.ezfiles.reader.platform.rememberTextToSpeech
 import com.ezfiles.reader.presentation.theme.EzColors
 import com.ezfiles.reader.presentation.theme.EzIcons
 import com.ezfiles.reader.presentation.components.GlassIconButton
+import com.ezfiles.reader.presentation.components.EzTextButton
 import com.ezfiles.reader.platform.PlatformBackHandler
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.mutableIntStateOf
@@ -80,7 +81,6 @@ fun VoiceAssistantSheet(
     onDismiss: () -> Unit,
     modelManager: ModelManager,
     session: FilySession,
-    speechEngine: com.ezfiles.reader.platform.SpeechEngine = com.ezfiles.reader.platform.SpeechEngine.System,
 ) {
     val scope = rememberCoroutineScope()
     val modelState by modelManager.state.collectAsState()
@@ -94,7 +94,7 @@ fun VoiceAssistantSheet(
 
     // Silent sessions in a row; after MAX_QUIET_RESTARTS Fily pauses instead of listening forever.
     var quietRestarts by remember { mutableIntStateOf(0) }
-    val speech = rememberSpeechRecognition(hints = session::speechHints, engine = speechEngine) { result ->
+    val speech = rememberSpeechRecognition(hints = session::speechHints) { result ->
         partialText = result.text
         if (result.isFinal && result.text.isNotBlank()) {
             quietRestarts = 0
@@ -134,6 +134,11 @@ fun VoiceAssistantSheet(
     // Continuous listening: the recognizer ends on silence, a timeout or a dropped service without a
     // request; Fily listens again by itself, and pauses after a long silence.
     LaunchedEffect(speechState, assistantState) {
+        // No English on the phone yet: listening again can't help; Fily waits for the download.
+        if (speechState == SpeechState.NeedsLanguage) {
+            if (assistantState == AssistantState.Listening) assistantState = AssistantState.Idle
+            return@LaunchedEffect
+        }
         if (assistantState != AssistantState.Listening || speechState == SpeechState.Listening) return@LaunchedEffect
         delay(RESTART_DELAY_MS)
         if (assistantState != AssistantState.Listening) return@LaunchedEffect
@@ -200,13 +205,16 @@ fun VoiceAssistantSheet(
         contentAlignment = Alignment.BottomCenter,
     ) {
         // Conversation card at the top, under the status bar
-        val question = partialText.ifBlank { lastUserText }
+        val needsLanguage = speechState == SpeechState.NeedsLanguage
+        val question = if (needsLanguage) "" else partialText.ifBlank { lastUserText }
         val answer = when {
+            needsLanguage -> "To hear you offline, your phone needs an English speech pack (any English works). " +
+                "Download it, then tap the orb."
             assistantState == AssistantState.Processing -> if (thinkingSeconds < 2) "Thinking…" else "Thinking… ${thinkingSeconds}s"
             else -> lastResponse
         }
         AnimatedVisibility(
-            visible = question.isNotBlank() || answer.isNotBlank(),
+            visible = question.isNotBlank() || answer.isNotBlank() || needsLanguage,
             enter = fadeIn(tween(200)) + slideInVertically(tween(250)) { -it / 3 },
             exit = fadeOut(tween(200)) + slideOutVertically(tween(200)) { -it / 3 },
             modifier = Modifier
@@ -236,6 +244,7 @@ fun VoiceAssistantSheet(
                         style = MaterialTheme.typography.titleMedium.copy(lineHeight = 24.sp),
                     )
                 }
+                if (needsLanguage) EzTextButton("Download English", speech::downloadLanguage)
                 Text(
                     "Fily · On-device",
                     color = EzColors.TextSecondary.copy(alpha = 0.7f),
@@ -257,6 +266,7 @@ fun VoiceAssistantSheet(
         val (status, dot) = when {
             modelState == ModelState.Error -> "Fily couldn't load" to Color(0xFFE5484D)
             modelState != ModelState.Ready -> "Loading Fily…" to Color(0xFFF5A524)
+            needsLanguage -> "English speech pack needed" to Color(0xFFF5A524)
             assistantState == AssistantState.Listening && speechState == SpeechState.Listening -> "Listening · speak now" to Color(0xFF30A46C)
             assistantState == AssistantState.Listening -> "Starting the mic…" to Color(0xFFF5A524)
             assistantState == AssistantState.Processing -> "Thinking…" to Color(0xFF3E63DD)

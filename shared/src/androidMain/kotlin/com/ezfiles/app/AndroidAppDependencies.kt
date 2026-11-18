@@ -156,9 +156,6 @@ private fun createAndroidAppDependencies(
     )
     val readerControl = ReaderControl()
     val modelDownloads = com.ezfiles.reader.data.AndroidModelDownloads(app)
-    com.ezfiles.reader.platform.MoonshineSpeech.folder = {
-        modelDownloads.folder(com.ezfiles.reader.application.assistant.AssistantModel.Moonshine)
-    }
     val filySession = FilySession(
         { prompt, grammar -> modelManager.complete(prompt, grammar) },
         ToolExecutor(assistantActions, assistantNavigation, assistantTidy, readerControl),
@@ -200,7 +197,6 @@ private fun createAndroidAppDependencies(
         modelManager = modelManager,
         filySession = filySession,
         readerControl = readerControl,
-        speechSettings = com.ezfiles.reader.platform.SpeechSettings(storage),
         playbackMemory = com.ezfiles.reader.data.PlaybackMemory(storage, ::currentTimeMillis),
         modelDownloads = modelDownloads,
     )

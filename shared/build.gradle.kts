@@ -1,7 +1,3 @@
-import java.net.URI
-import java.security.MessageDigest
-import java.util.zip.ZipFile
-
 plugins {
     alias(libs.plugins.kotlin.multiplatform)
     alias(libs.plugins.android.library)
@@ -100,47 +96,3 @@ android {
     }
 }
 
-// Second speech engine: sherpa-onnx (Apache-2.0) runs Moonshine Base offline. The pinned release is
-// downloaded once, checked against its SHA-256, and only the Kotlin API and the two native libraries
-// its JNI layer needs are unpacked into .cache/ (no binaries in Git). The models are separate files on
-// the phone (see SpeechRecognition.android.kt).
-val sherpaVersion = "2.0.1"
-val sherpaSha256 = "a8d09d1d32f3eb8520482c6d3d43fae674681c5b050385967c70a3c2c9bf0ee7"
-val sherpaDir: File = rootProject.layout.projectDirectory.dir(".cache/sherpa-onnx-$sherpaVersion").asFile
-val fetchSherpaOnnx = tasks.register("fetchSherpaOnnx") {
-    description = "Downloads and unpacks the pinned sherpa-onnx Android release."
-    val dir = sherpaDir
-    val version = sherpaVersion
-    val expected = sherpaSha256
-    outputs.dir(dir)
-    onlyIf { !File(dir, "classes.jar").isFile }
-    doLast {
-        dir.mkdirs()
-        val aar = File(dir, "sherpa-onnx-$version.aar")
-        // A copy placed there by hand (e.g. downloaded with curl) is used as is, after the checksum.
-        if (!aar.isFile) {
-            URI("https://github.com/k2-fsa/sherpa-onnx/releases/download/v$version/sherpa-onnx-$version.aar")
-                .toURL().openStream().use { input -> aar.outputStream().use { input.copyTo(it) } }
-        }
-        val digest = MessageDigest.getInstance("SHA-256").digest(aar.readBytes()).joinToString("") { "%02x".format(it) }
-        check(digest == expected) { "sherpa-onnx $version checksum mismatch: $digest" }
-        ZipFile(aar).use { zip ->
-            val wanted = listOf("arm64-v8a", "x86_64").flatMap { abi ->
-                listOf("libsherpa-onnx-jni.so", "libonnxruntime.so").map { "jni/$abi/$it" }
-            } + "classes.jar"
-            for (name in wanted) {
-                val entry = zip.getEntry(name) ?: error("$name missing from sherpa-onnx $version")
-                val target = File(dir, name)
-                target.parentFile.mkdirs()
-                zip.getInputStream(entry).use { input -> target.outputStream().use { input.copyTo(it) } }
-            }
-        }
-        aar.delete()
-    }
-}
-kotlin.sourceSets.getByName("androidMain").dependencies {
-    implementation(files(File(sherpaDir, "classes.jar")).builtBy(fetchSherpaOnnx))
-}
-android.sourceSets.getByName("main").jniLibs.srcDir(File(sherpaDir, "jni"))
-tasks.matching { it.name == "preBuild" || (it.name.startsWith("merge") && it.name.endsWith("JniLibFolders")) }
-    .configureEach { dependsOn(fetchSherpaOnnx) }

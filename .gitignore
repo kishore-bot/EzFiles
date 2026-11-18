@@ -54,7 +54,7 @@ ezjks
 /training/data/**/*.txt
 /training/*.log
 /.vscode
-# Downloaded build dependencies (sherpa-onnx), see shared/build.gradle.kts
+# Downloaded build dependencies
 /.cache/
 
 # Local build logs

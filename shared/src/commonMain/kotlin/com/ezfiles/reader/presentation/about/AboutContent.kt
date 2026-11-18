@@ -65,8 +65,20 @@ data class TeamMember(val name: String, val role: String, val bio: String = "", 
  * Contact details supplied by the team; roles and biographies are omitted until supplied.
  */
 val Team: List<TeamMember> = listOf(
-    TeamMember(name = "KISHORE K", role = "", links = listOf(TeamLink("kishoreabhi333@gmail.com", "mailto:kishoreabhi333@gmail.com"))),
-    TeamMember(name = "Robin Isac", role = "", links = listOf(TeamLink("robinisacsharon@gmail.com", "mailto:robinisacsharon@gmail.com"))),
+    TeamMember(
+        name = "KISHORE K", role = "",
+        links = listOf(
+            TeamLink("kishoreabhi333@gmail.com", "mailto:kishoreabhi333@gmail.com"),
+            TeamLink("LinkedIn", "https://www.linkedin.com/in/kishorek1"),
+        ),
+    ),
+    TeamMember(
+        name = "Robin Isac", role = "",
+        links = listOf(
+            TeamLink("robinisacsharon@gmail.com", "mailto:robinisacsharon@gmail.com"),
+            TeamLink("LinkedIn", "https://www.linkedin.com/in/robin-isac-07ba01329"),
+        ),
+    ),
 )
 
 /** Up to two initials for an avatar: the first letters of the first and last words. */
@@ -129,8 +141,6 @@ val Licences: List<Licence> = listOf(
     ),
     Licence("llama.cpp and ggml (on-device assistant engine)", "MIT License"),
     Licence("Fily model, fine-tuned from Liquid AI LFM2.5-350M", "LFM Open License 1.0"),
-    Licence("sherpa-onnx and ONNX Runtime (Moonshine speech engine)", "Apache License 2.0 and MIT License"),
-    Licence("Moonshine speech model and Silero VAD", "MIT License"),
     Licence("Google ML Kit Text Recognition (on-device model)", "ML Kit Terms of Service (not open source)"),
     Licence("Firebase Crashlytics (optional Android diagnostics build)", "Apache License 2.0; Firebase service terms apply"),
 )

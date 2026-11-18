@@ -173,10 +173,9 @@ class AppDependencies internal constructor(
     internal val filySession: com.ezfiles.reader.application.assistant.FilySession? = null,
     /** The viewer on screen, as the assistant may drive it. */
     internal val readerControl: com.ezfiles.reader.application.assistant.ReaderControl? = null,
-    internal val speechSettings: com.ezfiles.reader.platform.SpeechSettings? = null,
     /** Where each video was left, to continue there. */
     internal val playbackMemory: com.ezfiles.reader.data.PlaybackMemory = com.ezfiles.reader.data.NoPlaybackMemory,
-    /** Fily's and Moonshine's model files, downloaded on request. */
+    /** Fily's model file, downloaded on request. */
     internal val modelDownloads: com.ezfiles.reader.application.assistant.ModelDownloads? = null,
 )
 
@@ -265,8 +264,6 @@ fun App(
     val appScope = rememberCoroutineScope()
     val themePreference by dependencies.themeSettings.preference.collectAsStateWithLifecycle()
     val hapticsOn by dependencies.themeSettings.haptics.collectAsStateWithLifecycle()
-    val speechEngine by (dependencies.speechSettings?.engine ?: kotlinx.coroutines.flow.MutableStateFlow(com.ezfiles.reader.platform.SpeechEngine.System))
-        .collectAsStateWithLifecycle()
     val assistantOn by dependencies.assistantAccess.enabled.collectAsStateWithLifecycle()
     val assistantContentOn by dependencies.assistantAccess.contentAccess.collectAsStateWithLifecycle()
     val assistantDestination by dependencies.assistantNavigation.pending.collectAsStateWithLifecycle()
@@ -638,8 +635,6 @@ fun App(
                     onAssistantChange = dependencies.assistantAccess::setEnabled,
                     contentEnabled = assistantContentOn,
                     onContentChange = dependencies.assistantAccess::setContentAccess,
-                    speechEngine = speechEngine.takeIf { dependencies.speechSettings != null },
-                    onSpeechEngineChange = { dependencies.speechSettings?.set(it) },
                     onClearSearchIndex = dependencies.contentSearch?.let { search -> { appScope.launch { search.clear() } } },
                 )
             }
@@ -666,7 +661,6 @@ fun App(
                     },
                     modelManager = model,
                     session = session,
-                    speechEngine = speechEngine,
                 )
             }
         }

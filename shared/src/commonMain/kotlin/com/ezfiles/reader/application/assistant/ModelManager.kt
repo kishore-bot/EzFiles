@@ -83,6 +83,13 @@ class ModelManager internal constructor(
         _state.value = ModelState.Idle
     }
 
+    /** Frees the model after any answer still being written (on the model's own thread). */
+    suspend fun release() {
+        if (_state.value == ModelState.Idle) return
+        withContext(lane) { inference.unload() }
+        _state.value = ModelState.Idle
+    }
+
     private fun gpuIsBad() {
         onGpu = false
         storage.put(GPU_KEY, "$buildStamp:$BAD")

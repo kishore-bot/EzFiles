@@ -298,6 +298,18 @@ class FilySessionTest {
     }
 
     @Test
+    fun switchedOffFilyDoesNothingNotEvenBuiltInCommands() = runTest {
+        val f = FilyFixture(listOf(doc("resume.pdf")))
+        var closed = false
+        val session = FilySession({ _, _ -> error("the model must not be asked") }, f.tools, f.access, today = { "2026-11-18" })
+        session.closeDocument = { closed = true }
+        f.access.setEnabled(false)
+        assertTrue("turned off" in session.ask("close this"))
+        assertTrue("turned off" in session.ask("find my resume"))
+        assertFalse(closed)
+    }
+
+    @Test
     fun isoDatesRoundTrip() {
         val millis = parseIsoDate("2026-11-16")!!
         assertEquals("2026-11-16", isoDate(millis))

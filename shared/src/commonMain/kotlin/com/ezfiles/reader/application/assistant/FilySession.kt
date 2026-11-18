@@ -58,6 +58,8 @@ class FilySession(
 
     /** Returns the text to show and speak. */
     suspend fun ask(request: String): String {
+        // The settings switch is the last word: off means Fily does nothing at all.
+        if (!access.enabled.value) return OFF_REPLY
         val screen = screen
         QuickCommands.parse(request, screen.readerCapabilities, screen.pageCount)?.let { return quick(request, it) }
         val show = showSection
@@ -272,6 +274,7 @@ class FilySession(
         const val MAX_HISTORY_EXCHANGES = 2
         const val UNOFFERED_TOOL = """{"status":"failed","reason":"unsupported_tool"}"""
         const val MAX_FILE_HINTS = 80
+        const val OFF_REPLY = "Fily is turned off. Switch on \"Fily and assistants\" in About EzFiles to use me."
         val COMMAND_HINTS = listOf(
             "Fily", "next page", "previous page", "go to page", "zoom in", "zoom out", "scroll down", "scroll up",
             "select cell", "next sheet", "next photo", "rotate", "play", "pause", "open", "find", "resume", "CV",

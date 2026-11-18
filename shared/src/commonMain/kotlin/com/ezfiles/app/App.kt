@@ -245,8 +245,14 @@ fun App(
     // Fily loads once its model is on the phone: at start, or as soon as a download finishes.
     val filyInstall by (dependencies.modelDownloads?.state(com.ezfiles.reader.application.assistant.AssistantModel.Fily)
         ?: kotlinx.coroutines.flow.MutableStateFlow(com.ezfiles.reader.application.assistant.ModelInstall.Missing)).collectAsStateWithLifecycle()
-    LaunchedEffect(dependencies.modelManager, filyInstall) {
+    // With "Fily and assistants" off, Fily isn't loaded at all (and is unloaded when switched off).
+    val filyAllowed by dependencies.assistantAccess.enabled.collectAsStateWithLifecycle()
+    LaunchedEffect(dependencies.modelManager, filyInstall, filyAllowed) {
         val mm = dependencies.modelManager ?: return@LaunchedEffect
+        if (!filyAllowed) {
+            mm.release()
+            return@LaunchedEffect
+        }
         val folder = dependencies.modelDownloads?.folder(com.ezfiles.reader.application.assistant.AssistantModel.Fily)
             ?: return@LaunchedEffect
         val state = mm.state.value
@@ -302,7 +308,9 @@ fun App(
             // Without its model on the phone, the mic first offers the one-time download.
             var gettingFily by rememberSaveable { mutableStateOf(false) }
             val startVoice = { if (micPermission.granted) voiceOpen = true else micPermission.request() }
-            val openVoice: (() -> Unit)? = if (dependencies.modelManager != null && dependencies.filySession != null) {
+            // Switched off: no mic button, and an open Fily closes.
+            LaunchedEffect(assistantOn) { if (!assistantOn) voiceOpen = false }
+            val openVoice: (() -> Unit)? = if (assistantOn && dependencies.modelManager != null && dependencies.filySession != null) {
                 {
                     if (filyInstall == com.ezfiles.reader.application.assistant.ModelInstall.Installed) startVoice() else gettingFily = true
                 }
@@ -653,7 +661,7 @@ fun App(
             }
             val model = dependencies.modelManager
             val session = dependencies.filySession
-            if (voiceOpen && model != null && session != null) {
+            if (voiceOpen && assistantOn && model != null && session != null) {
                 VoiceAssistantSheet(
                     onDismiss = {
                         voiceOpen = false

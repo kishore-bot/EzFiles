@@ -123,7 +123,7 @@ fn replace_text_nodes(xml: &str, find: &str, replace: &str, case_sensitive: bool
         } else if bytes[i] == b'<' {
             if i > seg_start {
                 let text = &xml[seg_start..i];
-                let (replaced, c) = replace_text(text, find, replace, case_sensitive);
+                let (replaced, c) = replace_escaped(text, find, replace, case_sensitive);
                 count += c;
                 result.push_str(&replaced);
             }
@@ -136,7 +136,7 @@ fn replace_text_nodes(xml: &str, find: &str, replace: &str, case_sensitive: bool
     }
     if !in_tag && seg_start < bytes.len() {
         let text = &xml[seg_start..];
-        let (replaced, c) = replace_text(text, find, replace, case_sensitive);
+        let (replaced, c) = replace_escaped(text, find, replace, case_sensitive);
         count += c;
         result.push_str(&replaced);
     }
@@ -194,25 +194,105 @@ fn replace_in_xml(xml: &str, find: &str, replace: &str, case_sensitive: bool, te
     let mut pos = 0;
 
     while pos < xml.len() {
-        if let Some(rel) = xml[pos..].find(&open_tag) {
-            let tag_start = pos + rel;
-            if let Some(gt) = xml[tag_start..].find('>') {
-                let content_start = tag_start + gt + 1;
-                if let Some(cl) = xml[content_start..].find(&close_tag) {
-                    let content_end = content_start + cl;
-                    result.push_str(&xml[pos..content_start]);
-                    let (replaced, c) = replace_text(&xml[content_start..content_end], find, replace, case_sensitive);
-                    count += c;
-                    result.push_str(&replaced);
-                    pos = content_end;
-                    continue;
+        let Some(rel) = xml[pos..].find(&open_tag) else { break };
+        let tag_start = pos + rel;
+        let name_end = tag_start + open_tag.len();
+        // Exact element only: `<w:t>` or `<w:t attr…>`, never `<w:tbl>`, `<w:tab/>`…
+        let exact = matches!(xml.as_bytes().get(name_end), Some(b'>' | b' ' | b'\t' | b'\r' | b'\n'));
+        let Some(gt) = xml[tag_start..].find('>') else { break };
+        let content_start = tag_start + gt + 1;
+        let self_closing = xml.as_bytes()[content_start - 2] == b'/';
+        if !exact || self_closing {
+            result.push_str(&xml[pos..content_start]);
+            pos = content_start;
+            continue;
+        }
+        let Some(cl) = xml[content_start..].find(&close_tag) else { break };
+        let content_end = content_start + cl;
+        result.push_str(&xml[pos..content_start]);
+        let (replaced, c) = replace_escaped(&xml[content_start..content_end], find, replace, case_sensitive);
+        count += c;
+        result.push_str(&replaced);
+        pos = content_end;
+    }
+    result.push_str(&xml[pos..]);
+    (result, count)
+}
+
+/// Replaces inside escaped XML character data: decodes entities, replaces,
+/// and re-escapes, so `&` / `<` in either string stay well-formed.
+fn replace_escaped(raw: &str, find: &str, replace: &str, case_sensitive: bool) -> (String, u32) {
+    let decoded = xml_unescape(raw);
+    let (out, count) = replace_text(&decoded, find, replace, case_sensitive);
+    if count == 0 {
+        return (raw.to_owned(), 0);
+    }
+    (xml_escape(&out), count)
+}
+
+fn xml_unescape(s: &str) -> String {
+    if !s.contains('&') {
+        return s.to_owned();
+    }
+    let mut out = String::with_capacity(s.len());
+    let mut rest = s;
+    while let Some(amp) = rest.find('&') {
+        out.push_str(&rest[..amp]);
+        rest = &rest[amp..];
+        let decoded = rest.find(';').filter(|&semi| semi <= 10).and_then(|semi| {
+            let ch = match &rest[1..semi] {
+                "amp" => Some('&'),
+                "lt" => Some('<'),
+                "gt" => Some('>'),
+                "quot" => Some('"'),
+                "apos" => Some('\''),
+                e if e.starts_with("#x") || e.starts_with("#X") => {
+                    u32::from_str_radix(&e[2..], 16).ok().and_then(char::from_u32)
                 }
+                e if e.starts_with('#') => e[1..].parse().ok().and_then(char::from_u32),
+                _ => None,
+            };
+            ch.map(|c| (c, semi + 1))
+        });
+        match decoded {
+            Some((c, len)) => {
+                out.push(c);
+                rest = &rest[len..];
+            }
+            None => {
+                out.push('&');
+                rest = &rest[1..];
             }
         }
-        result.push_str(&xml[pos..]);
-        break;
     }
-    (result, count)
+    out.push_str(rest);
+    out
+}
+
+fn xml_escape(s: &str) -> String {
+    let mut out = String::with_capacity(s.len());
+    for c in s.chars() {
+        match c {
+            '&' => out.push_str("&amp;"),
+            '<' => out.push_str("&lt;"),
+            '>' => out.push_str("&gt;"),
+            _ => out.push(c),
+        }
+    }
+    out
+}
+
+/// Byte length of the prefix of `hay` that equals `needle` ignoring case,
+/// compared char by char on the original text (no offset mapping).
+fn match_ignore_case(hay: &str, needle: &str) -> Option<usize> {
+    let mut hay_chars = hay.char_indices();
+    for n in needle.chars() {
+        let (_, h) = hay_chars.next()?;
+        if !h.to_lowercase().eq(n.to_lowercase()) {
+            return None;
+        }
+    }
+    Some(hay_chars.next().map_or(hay.len(), |(i, _)| i))
 }
 
 fn replace_text(text: &str, find: &str, replace: &str, case_sensitive: bool) -> (String, u32) {
@@ -221,19 +301,20 @@ fn replace_text(text: &str, find: &str, replace: &str, case_sensitive: bool) -> 
         let count = (parts.len() as u32).saturating_sub(1);
         (parts.join(replace), count)
     } else {
-        let find_lower = find.to_lowercase();
-        let text_lower = text.to_lowercase();
         let mut out = String::with_capacity(text.len());
         let mut count = 0u32;
         let mut last = 0;
-        let mut search = 0;
-        while let Some(idx) = text_lower[search..].find(&find_lower) {
-            let abs = search + idx;
-            out.push_str(&text[last..abs]);
-            out.push_str(replace);
-            last = abs + find.len();
-            search = last;
-            count += 1;
+        let mut i = 0;
+        while i < text.len() {
+            if let Some(len) = match_ignore_case(&text[i..], find) {
+                out.push_str(&text[last..i]);
+                out.push_str(replace);
+                i += len;
+                last = i;
+                count += 1;
+            } else {
+                i += text[i..].chars().next().map_or(1, char::len_utf8);
+            }
         }
         out.push_str(&text[last..]);
         (out, count)
@@ -384,6 +465,35 @@ mod tests {
         let mut out = open(&report.output).unwrap();
         let result = String::from_utf8(out.read_to_vec("ppt/slides/slide1.xml").unwrap()).unwrap();
         assert!(result.contains("New Title"));
+    }
+
+    #[test]
+    fn similar_tags_are_not_text() {
+        let xml = r#"<w:tbl><w:tr><w:tc><w:p><w:r><w:tab/><w:t>tbl</w:t></w:r></w:p></w:tc></w:tr></w:tbl>"#;
+        let (out, n) = replace_in_xml(xml, "w", "X", true, "w:t");
+        assert_eq!(n, 0);
+        assert_eq!(out, xml);
+        let (out, n) = replace_in_xml(xml, "tbl", "T", true, "w:t");
+        assert_eq!(n, 1);
+        assert!(out.starts_with("<w:tbl><w:tr><w:tc>") && out.contains("<w:t>T</w:t>"));
+    }
+
+    #[test]
+    fn entities_are_decoded_and_escaped() {
+        let xml = r#"<w:t xml:space="preserve">A &amp; B</w:t>"#;
+        let (out, n) = replace_in_xml(xml, "&", "<and>", true, "w:t");
+        assert_eq!(n, 1);
+        assert_eq!(out, r#"<w:t xml:space="preserve">A &lt;and&gt; B</w:t>"#);
+    }
+
+    #[test]
+    fn ignore_case_handles_length_changing_lowercase() {
+        let (out, n) = replace_text("İx İX ok", "ix", "y", false);
+        assert_eq!(n, 0);
+        assert_eq!(out, "İx İX ok");
+        let (out, n) = replace_text("Straße STRASSE straße", "STRAßE", "road", false);
+        assert_eq!(n, 2);
+        assert_eq!(out, "road STRASSE road");
     }
 
     #[test]

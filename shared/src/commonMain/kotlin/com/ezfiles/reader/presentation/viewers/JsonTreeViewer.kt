@@ -239,13 +239,14 @@ private fun collectLines(
     path: String,
     collapsed: MutableMap<String, Boolean>,
     lines: MutableList<@Composable () -> Unit>,
+    trailing: String = "",
 ) {
     val indent = "  ".repeat(depth)
     when (node) {
         is JsonNode.Obj -> {
             val isCollapsed = collapsed[path] == true
             lines += @Composable {
-                JsonLineRow(indent, isCollapsed, node.entries.size, "{", "}", path, collapsed)
+                JsonLineRow(indent, isCollapsed, node.entries.size, "{", "}$trailing", path, collapsed)
             }
             if (!isCollapsed) {
                 node.entries.forEachIndexed { i, (key, value) ->
@@ -255,21 +256,18 @@ private fun collectLines(
                     when (value) {
                         is JsonNode.Obj, is JsonNode.Arr -> {
                             lines += @Composable { KeyLabel(childIndent, key) }
-                            collectLines(value, depth + 1, childPath, collapsed, lines)
-                            if (comma.isNotEmpty()) {
-                                // comma handled by close bracket
-                            }
+                            collectLines(value, depth + 1, childPath, collapsed, lines, comma)
                         }
                         else -> lines += @Composable { KeyValueLine(childIndent, key, value, comma) }
                     }
                 }
-                lines += @Composable { CloseBracket(indent, "}") }
+                lines += @Composable { CloseBracket(indent, "}$trailing") }
             }
         }
         is JsonNode.Arr -> {
             val isCollapsed = collapsed[path] == true
             lines += @Composable {
-                JsonLineRow(indent, isCollapsed, node.items.size, "[", "]", path, collapsed)
+                JsonLineRow(indent, isCollapsed, node.items.size, "[", "]$trailing", path, collapsed)
             }
             if (!isCollapsed) {
                 node.items.forEachIndexed { i, item ->
@@ -278,12 +276,12 @@ private fun collectLines(
                     val comma = if (i < node.items.size - 1) "," else ""
                     when (item) {
                         is JsonNode.Obj, is JsonNode.Arr -> {
-                            collectLines(item, depth + 1, childPath, collapsed, lines)
+                            collectLines(item, depth + 1, childPath, collapsed, lines, comma)
                         }
                         else -> lines += @Composable { ValueLine(childIndent, item, comma) }
                     }
                 }
-                lines += @Composable { CloseBracket(indent, "]") }
+                lines += @Composable { CloseBracket(indent, "]$trailing") }
             }
         }
         else -> lines += @Composable { ValueLine(indent, node, "") }

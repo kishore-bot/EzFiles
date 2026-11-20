@@ -338,7 +338,7 @@ fun ReaderScreen(
                         onEdit = if (ready?.canEdit == true) ({ onAction(ReaderAction.OpenEditor) }) else null,
                         onFindReplace = if (docEditor != null && ready?.info?.format in setOf(DocumentFormat.Docx, DocumentFormat.Pptx, DocumentFormat.Odt, DocumentFormat.Odp)) ({ findReplaceOpen = true }) else null,
                         darkReading = darkReading,
-                        onToggleDarkReading = if (ready?.info?.kind in setOf(DocumentKind.Text, DocumentKind.Spreadsheet)) ({ onAction(ReaderAction.ToggleDarkReading) }) else null,
+                        onToggleDarkReading = if (ready?.info?.kind in setOf(DocumentKind.Text, DocumentKind.Spreadsheet, DocumentKind.Archive)) ({ onAction(ReaderAction.ToggleDarkReading) }) else null,
                         onSlideTools = if (docEditor != null && ready?.info?.format == DocumentFormat.Pptx) ({
                             slideScope.launch {
                                 val ref = ready.ref
@@ -580,6 +580,13 @@ private fun ReaderTopBar(
     var glanceOpen by remember { mutableStateOf(false) }
     val canGlance = LocalGlancer.current != null && ref != null
     if (glanceOpen && ref != null) GlanceSheet(ref, title) { glanceOpen = false }
+    var darkUnavailable by remember { mutableStateOf(false) }
+    if (darkUnavailable) EzDialog(
+        onDismissRequest = { darkUnavailable = false },
+        confirmButton = { EzTextButton("OK", { darkUnavailable = false }) },
+        title = { Text("Dark / light reading") },
+        text = { Text("Dark and light reading isn't available for this file type. It shows in its original colours.") },
+    )
     // The narrower reader gutter lines the bar up with the page below it.
     EzTopBar(title = title, onBack = onBack, backLabel = "Back to files", gutter = EzSpacing.ReaderGutter) {
         if (onSearch != null) BarIconButton(EzIcons.Search, "Find in document", onSearch)
@@ -624,7 +631,7 @@ private fun ReaderTopBar(
                     if (darkReading) "Light reading" else "Dark reading",
                     if (darkReading) EzIcons.LightMode else EzIcons.DarkMode,
                     onToggleDarkReading,
-                )
+                ) else if (info != null) item("Dark reading", EzIcons.DarkMode) { darkUnavailable = true }
                 if (onSlideTools != null) item("Slide tools", EzIcons.ListLines, onSlideTools)
                 if (onPdfTools != null) item("PDF tools", EzIcons.PdfFile, onPdfTools)
                 if (info != null) item("File details", EzIcons.Document) { detailsOpen = true }

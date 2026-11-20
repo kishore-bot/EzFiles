@@ -194,7 +194,5 @@ sealed interface ReaderAction {
     data object CloseDocument : ReaderAction
     /** Extract a ZIP entry to a user-chosen location. */
     data class ExtractEntry(val path: String) : ReaderAction
-    data class ShowFindReplace(val show: Boolean) : ReaderAction
-    data class ReplaceAll(val find: String, val replace: String, val caseSensitive: Boolean) : ReaderAction
     data object ToggleDarkReading : ReaderAction
 }

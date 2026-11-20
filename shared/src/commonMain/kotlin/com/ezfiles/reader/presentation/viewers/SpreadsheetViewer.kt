@@ -152,7 +152,8 @@ fun SpreadsheetViewer(
     val csvEditable = state.info.format == DocumentFormat.Csv
     val xlsxEditable = onSaveXlsx != null
     val editable = csvEditable || xlsxEditable
-    val editState = if (editable) remember(state.ref, state.openId) { SheetEditState() } else null
+    val sheetEdits = remember(state.ref, state.openId) { mutableMapOf<Int, SheetEditState>() }
+    val editState = if (editable) sheetEdits.getOrPut(sheetIndex) { SheetEditState() } else null
     var editingCell by remember { mutableStateOf<Triple<Int, Int, String>?>(null) }
 
     // A few pages load on their own, so the tabs of later sheets appear.

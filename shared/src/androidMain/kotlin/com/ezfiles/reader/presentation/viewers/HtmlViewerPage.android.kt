@@ -267,8 +267,8 @@ private class LockedWebView private constructor(
             }
             view.setBackgroundColor(if (kind == PageKind.Pages) 0xFFE8E8EC.toInt() else Color.WHITE)
             // A book turns pages itself; the view mustn't scroll or show edge glows.
-            if (kind == PageKind.Book) view.overScrollMode = View.OVER_SCROLL_NEVER
-            view.overScrollMode = View.OVER_SCROLL_IF_CONTENT_SCROLLS
+            view.overScrollMode =
+                if (kind == PageKind.Book) View.OVER_SCROLL_NEVER else View.OVER_SCROLL_IF_CONTENT_SCROLLS
             if (kind == PageKind.Book) {
                 view.isVerticalScrollBarEnabled = false
                 view.isHorizontalScrollBarEnabled = false

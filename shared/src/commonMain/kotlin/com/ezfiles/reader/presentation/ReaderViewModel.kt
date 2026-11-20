@@ -102,8 +102,6 @@ class ReaderViewModel(
                 _state.value = Idle
             }
             is ReaderAction.ExtractEntry -> extractEntry(action.path)
-            is ReaderAction.ShowFindReplace -> _showFindReplace.value = action.show
-            is ReaderAction.ReplaceAll -> {} // wired to UI; engine call runs from App.kt
             ReaderAction.ToggleDarkReading -> _darkReading.value = !(_darkReading.value ?: themeDark)
         }
     }
@@ -268,9 +266,6 @@ class ReaderViewModel(
 
     /** An embedded resource of the open document, such as a slide picture. */
     suspend fun loadResource(name: String): ByteArray? = reading.resource(name)
-
-    private val _showFindReplace = MutableStateFlow(false)
-    val showFindReplace: StateFlow<Boolean> = _showFindReplace.asStateFlow()
 
     /**
      * Null: documents follow the app theme (dark pages in dark mode). The reader menu's "Dark reading"

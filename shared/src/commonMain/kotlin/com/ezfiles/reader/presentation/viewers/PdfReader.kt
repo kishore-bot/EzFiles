@@ -832,7 +832,7 @@ private fun PdfReaderContent(
         )
         SaveStep.ConfirmOverwrite -> ConfirmDialog(
             title = "Update the original?",
-            message = "Your annotations will be added to the original file. Its current content stays in the file, but EzFiles can't take the annotations out again.",
+            message = "Your annotations will be added to the original file. Its current content stays in the file, but Xfiles can't take the annotations out again.",
             confirm = "Update original",
             dismiss = "Cancel",
             onConfirm = {

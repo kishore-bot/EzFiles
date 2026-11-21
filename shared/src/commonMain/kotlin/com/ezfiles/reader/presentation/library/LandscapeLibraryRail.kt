@@ -74,7 +74,7 @@ internal fun LandscapeLibraryRail(items: List<EzNavItem>, onOpenFile: () -> Unit
             }
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 GlassIconButton(EzIcons.Folder, "Open file", onOpenFile)
-                if (onOpenAbout != null) GlassIconButton(EzIcons.Info, "About EzFiles", onOpenAbout)
+                if (onOpenAbout != null) GlassIconButton(EzIcons.Info, "About Xfiles", onOpenAbout)
             }
         }
     }

@@ -183,7 +183,7 @@ internal class AndroidPdfTools(context: Context) : PdfTools {
         val sink = try {
             app.contentResolver.openOutputStream(target, "wt")
         } catch (_: SecurityException) {
-            throw DocumentException(DocumentError.FileAccess("EzFiles doesn't have permission to save there."))
+            throw DocumentException(DocumentError.FileAccess("Xfiles doesn't have permission to save there."))
         } catch (_: IOException) {
             throw DocumentException(DocumentError.FileAccess("The file could not be saved there."))
         } ?: throw DocumentException(DocumentError.FileAccess("The app that provides this location did not accept the file."))

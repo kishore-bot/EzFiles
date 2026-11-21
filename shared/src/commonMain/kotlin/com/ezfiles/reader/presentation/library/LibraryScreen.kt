@@ -392,7 +392,7 @@ fun LibraryScreen(
         EzDialog(
             onDismissRequest = { removingFolder = null },
             title = { Text("Remove ${folder.name}?") },
-            text = { Text("EzFiles will stop listing this folder and give up access to it. Your files stay where they are.") },
+            text = { Text("Xfiles will stop listing this folder and give up access to it. Your files stay where they are.") },
             confirmButton = {
                 EzTextButton("Remove", {
                     removingFolder = null
@@ -408,7 +408,7 @@ fun LibraryScreen(
         EzDialog(
             onDismissRequest = { confirmingClear = false },
             title = { Text("Clear recent files?") },
-            text = { Text("EzFiles forgets which files you opened. The files themselves stay where they are.") },
+            text = { Text("Xfiles forgets which files you opened. The files themselves stay where they are.") },
             confirmButton = {
                 EzTextButton("Clear", {
                     confirmingClear = false
@@ -445,7 +445,7 @@ private fun SearchNote(text: String) {
 }
 
 private const val ADD_FOLDER_EXPLANATION =
-    "Choose a folder, such as Documents, and EzFiles lists the files in it and its subfolders. Files stay on this device.\n\n" +
+    "Choose a folder, such as Documents, and Xfiles lists the files in it and its subfolders. Files stay on this device.\n\n" +
         "On Android, folder access can also allow Tidy up to delete an identical extra copy after you confirm. Read-only folders still work for reading.\n\n" +
         "Since Android 11, Android doesn't let apps choose the main storage folder, the Download folder or Android/data. " +
         "For files in Downloads, use Open file, which opens them one at a time."
@@ -458,7 +458,7 @@ private fun NoFoldersCard(onAddFolder: () -> Unit) {
     ) {
         Text("Bring in your documents", style = MaterialTheme.typography.titleMedium, color = EzColors.Text)
         Text(
-            "Add a folder, such as Documents, and EzFiles lists every file in it. Files stay on this device.",
+            "Add a folder, such as Documents, and Xfiles lists every file in it. Files stay on this device.",
             style = MaterialTheme.typography.bodyMedium,
             color = EzColors.TextSecondary,
         )
@@ -555,13 +555,13 @@ private fun Header(onOpenAbout: (() -> Unit)?, onVoice: (() -> Unit)? = null, co
         horizontalArrangement = Arrangement.spacedBy(14.dp),
     ) {
         Text(
-            "EzFiles",
+            "Xfiles",
             style = if (compact) MaterialTheme.typography.titleLarge else MaterialTheme.typography.headlineMedium,
             color = EzColors.Text,
             modifier = Modifier.weight(1f).semantics { heading() },
         )
         if (onVoice != null) GlassIconButton(EzIcons.Mic, "Voice assistant", onVoice)
-        if (onOpenAbout != null) GlassIconButton(EzIcons.Info, "About EzFiles", onOpenAbout)
+        if (onOpenAbout != null) GlassIconButton(EzIcons.Info, "About Xfiles", onOpenAbout)
     }
 }
 
@@ -576,7 +576,7 @@ private fun SearchField(
 ) {
     Row(modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(16.dp)) {
         if (compact) Text(
-            "EzFiles",
+            "Xfiles",
             style = MaterialTheme.typography.titleLarge,
             color = EzColors.Text,
             modifier = Modifier.semantics { heading() },

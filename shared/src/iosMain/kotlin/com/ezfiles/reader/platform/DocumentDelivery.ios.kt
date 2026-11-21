@@ -168,7 +168,7 @@ private object IosDocumentDelivery : DocumentDelivery {
     @Suppress("DEPRECATION") // Same single-window host as the document picker.
     private fun presenter(): UIViewController {
         var controller = UIApplication.sharedApplication.keyWindow?.rootViewController
-            ?: throw unavailable("Open EzFiles before sharing or printing.")
+            ?: throw unavailable("Open Xfiles before sharing or printing.")
         while (controller.presentedViewController != null) controller = checkNotNull(controller.presentedViewController)
         return controller
     }

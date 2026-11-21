@@ -98,7 +98,7 @@ private class AndroidPdfZipWriter(private val app: Context, private val file: Fi
             throw DocumentException(DocumentError.FileAccess("The ZIP could not be saved there."))
         } catch (e: SecurityException) {
             discardPartial(target)
-            throw DocumentException(DocumentError.FileAccess("EzFiles doesn't have permission to save there."))
+            throw DocumentException(DocumentError.FileAccess("Xfiles doesn't have permission to save there."))
         }
     }
 
@@ -125,7 +125,7 @@ private inline fun <T> accessing(message: String, block: () -> T): T = try {
 } catch (e: IOException) {
     throw DocumentException(DocumentError.FileAccess(message))
 } catch (e: SecurityException) {
-    throw DocumentException(DocumentError.FileAccess("EzFiles no longer has access to this file."))
+    throw DocumentException(DocumentError.FileAccess("Xfiles no longer has access to this file."))
 }
 
 /**
@@ -141,7 +141,7 @@ internal fun ZipOutputStream.addCompressedEntry(entryName: String, input: InputS
         if (read < 0) break
         total += read
         if (total > maxBytes) {
-            throw DocumentException(DocumentError.LimitExceeded("This PDF is larger than ${maxBytes / (1024 * 1024)} MB, the most EzFiles will archive."))
+            throw DocumentException(DocumentError.LimitExceeded("This PDF is larger than ${maxBytes / (1024 * 1024)} MB, the most Xfiles will archive."))
         }
         write(buffer, 0, read)
         onChunk(total)

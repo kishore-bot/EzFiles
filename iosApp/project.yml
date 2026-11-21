@@ -18,7 +18,7 @@ targets:
     info:
       path: iosApp/Info.plist
       properties:
-        CFBundleDisplayName: EzFiles
+        CFBundleDisplayName: Xfiles
         UILaunchScreen: {}
         # Lets the picker open files in place from Files/iCloud providers.
         LSSupportsOpeningDocumentsInPlace: true

@@ -27,7 +27,7 @@ import java.security.MessageDigest
 import kotlin.coroutines.coroutineContext
 
 /**
- * Models live in the app's private data folder (`files/models/<model>/`), which only EzFiles can read
+ * Models live in the app's private data folder (`files/models/<model>/`), which only Xfiles can read
  * and which Android removes with the app. A download resumes where it stopped; every file is checked
  * against its SHA-256 before it is used, and only then moved into place.
  */

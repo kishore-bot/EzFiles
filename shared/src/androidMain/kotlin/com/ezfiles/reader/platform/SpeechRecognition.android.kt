@@ -42,7 +42,7 @@ actual class SpeechRecognition(
     private var language: String? = null
 
     /**
-     * The system's default recognizer may stream audio to a server. EzFiles is offline, so the
+     * The system's default recognizer may stream audio to a server. Xfiles is offline, so the
      * on-device recognizer is used wherever the phone has one, and the default one is told to
      * stay offline otherwise.
      */

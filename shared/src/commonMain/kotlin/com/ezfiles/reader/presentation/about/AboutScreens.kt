@@ -139,11 +139,11 @@ private fun AboutFrame(title: String, onBack: () -> Unit, content: @Composable C
     }
 }
 
-// ---------------------------------------------------------------- Why EzFiles
+// ---------------------------------------------------------------- Why Xfiles
 
 @Composable
 fun VisionScreen(onBack: () -> Unit) {
-    AboutFrame("Why EzFiles", onBack) {
+    AboutFrame("Why Xfiles", onBack) {
         VisionText.forEach { block ->
             when (block) {
                 is VisionBlock.Title -> VisionTitle(block.text)
@@ -255,14 +255,14 @@ fun AboutScreen(
     val appInfo = LocalAppInfo.current
     var showingLicences by rememberSaveable { mutableStateOf(false) }
     var showingFormats by rememberSaveable { mutableStateOf(false) }
-    AboutFrame("About EzFiles", onBack) {
+    AboutFrame("About Xfiles", onBack) {
         AppHeader()
         Spacer(Modifier.height(20.dp))
         AppearanceCard(theme, onThemeChange, haptics, onHapticsChange, assistantEnabled, onAssistantChange, contentEnabled, onContentChange)
         Spacer(Modifier.height(12.dp))
         NavigationCard(
             icon = AboutIcons.Heart,
-            title = "Why EzFiles",
+            title = "Why Xfiles",
             body = "The idea behind the app",
             onClick = onOpenVision,
         )
@@ -285,7 +285,7 @@ fun AboutScreen(
             NavigationCard(icon = AboutIcons.Mail, title = "Send feedback", body = "Write to us from your mail or messaging app", onClick = onSendFeedback)
             Spacer(Modifier.height(12.dp))
         }
-        NavigationCard(icon = AboutIcons.Code, title = "Open-source licences", body = "The libraries and fonts EzFiles is built with", onClick = { showingLicences = true })
+        NavigationCard(icon = AboutIcons.Code, title = "Open-source licences", body = "The libraries and fonts Xfiles is built with", onClick = { showingLicences = true })
     }
     if (showingLicences) LicencesSheet(onDismiss = { showingLicences = false })
     if (showingFormats) SupportedFilesSheet(onDismiss = { showingFormats = false })
@@ -308,7 +308,7 @@ private fun AppHeader() {
             }
         }
         Text(
-            "EzFiles",
+            "Xfiles",
             style = MaterialTheme.typography.headlineMedium,
             color = EzColors.Text,
             modifier = Modifier.padding(top = 16.dp).semantics { heading() },
@@ -436,7 +436,7 @@ private fun PrivacyCard(onClearSearchIndex: (() -> Unit)?) {
         }
         PrivacyPromises.forEach { CheckLine(it) }
         if (onClearSearchIndex != null) {
-            CheckLine("Search reads your files only on this device. Its index stays in EzFiles' private storage and skips locked files.")
+            CheckLine("Search reads your files only on this device. Its index stays in Xfiles' private storage and skips locked files.")
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Text(
                     if (cleared) "Search index cleared" else "Search index",
@@ -492,7 +492,7 @@ private fun TeamCard(member: TeamMember, canOpenLinks: Boolean, onOpenLink: (Str
     }
 }
 
-/** Every kind of file EzFiles opens: badge, name, extensions and what it does with them. */
+/** Every kind of file Xfiles opens: badge, name, extensions and what it does with them. */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun SupportedFilesSheet(onDismiss: () -> Unit) {
@@ -543,7 +543,7 @@ private fun LicencesSheet(onDismiss: () -> Unit) {
         ) {
             item {
                 Text(
-                    "EzFiles is built with these components. Thank you to everyone who made them.",
+                    "Xfiles is built with these components. Thank you to everyone who made them.",
                     style = MaterialTheme.typography.bodyMedium,
                     color = EzColors.TextSecondary,
                 )

@@ -50,8 +50,8 @@ internal fun CloudCrashReportingCard() {
         Text(when {
             saving -> "Saving your preference…"
             failed -> "Could not save the preference. Please try again."
-            enabled && !reports.active -> "Close and reopen EzFiles to activate reporting for future crashes. Existing local reports can still be shared manually."
-            !enabled && reports.active -> "New crash forwarding is off. Close and reopen EzFiles to fully unload diagnostics; reports already sent cannot be recalled."
+            enabled && !reports.active -> "Close and reopen Xfiles to activate reporting for future crashes. Existing local reports can still be shared manually."
+            !enabled && reports.active -> "New crash forwarding is off. Close and reopen Xfiles to fully unload diagnostics; reports already sent cannot be recalled."
             enabled -> "Future crash diagnostics may be sent to Firebase. Turn this off at any time."
             else -> "No Firebase initialization or crash uploads while this stays off."
         }, color = if (failed) EzColors.Accent else EzColors.TextSecondary)
@@ -59,7 +59,7 @@ internal fun CloudCrashReportingCard() {
     if (confirming) EzDialog(
         onDismissRequest = { confirming = false },
         title = { Text("Allow crash diagnostics?") },
-        text = { Text("After you restart EzFiles, Firebase Crashlytics can receive future technical crash diagnostics, app/device information and installation identifiers. Exception messages are scrubbed before forwarding; documents are not attached. The SDK report is different from the local report preview. No Analytics is added. You can turn this off here; already sent reports cannot be recalled.") },
+        text = { Text("After you restart Xfiles, Firebase Crashlytics can receive future technical crash diagnostics, app/device information and installation identifiers. Exception messages are scrubbed before forwarding; documents are not attached. The SDK report is different from the local report preview. No Analytics is added. You can turn this off here; already sent reports cannot be recalled.") },
         confirmButton = { EzTextButton("Allow", { confirming = false; save(true) }) },
         dismissButton = { EzTextButton("Keep off", { confirming = false }) },
     )

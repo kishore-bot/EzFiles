@@ -52,7 +52,7 @@ actual fun SystemBarAppearance(darkTheme: Boolean, appDark: Boolean?) {
 }
 
 /**
- * The launcher icon follows the theme chosen in EzFiles: one of three launcher
+ * The launcher icon follows the theme chosen in Xfiles: one of three launcher
  * aliases (see the manifest) is enabled, the others disabled. Some launchers
  * take a moment to redraw, and may drop a home-screen shortcut to the old one.
  */

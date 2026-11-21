@@ -263,9 +263,9 @@ private class AndroidDocumentDelivery(private val context: Context) : DocumentDe
     private fun foreground(): Activity {
         var current = context
         while (current is ContextWrapper && current !is Activity) current = current.baseContext
-        val activity = current as? Activity ?: fail("Return to EzFiles to share or print.")
+        val activity = current as? Activity ?: fail("Return to Xfiles to share or print.")
         if (activity.isFinishing || activity.isDestroyed || (activity as? LifecycleOwner)?.lifecycle?.currentState?.isAtLeast(Lifecycle.State.RESUMED) == false) {
-            fail("Return to EzFiles to share or print.")
+            fail("Return to Xfiles to share or print.")
         }
         return activity
     }
@@ -320,7 +320,7 @@ private suspend fun <T> deliveryErrors(block: suspend () -> T): T = try {
 } catch (error: DocumentException) {
     throw error
 } catch (_: SecurityException) {
-    fail("EzFiles no longer has access to this file. Open it again through the system picker.")
+    fail("Xfiles no longer has access to this file. Open it again through the system picker.")
 } catch (_: IOException) {
     fail("The file could not be prepared. Check available storage and try again.")
 } catch (_: android.content.ActivityNotFoundException) {

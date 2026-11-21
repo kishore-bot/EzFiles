@@ -136,12 +136,12 @@ class LibraryTest {
     }
 
     @Test
-    fun images_appear_under_their_own_category_only() = runTest {
+    fun images_appear_under_all_and_their_own_category() = runTest {
         val files = listOf(DocumentRef("u1", "photo.jpg"), DocumentRef("u2", "report.pdf"))
         val viewModel = LibraryViewModel(store(), FakeDevice(files, listOf(folderA)), Dispatchers.Main)
         val collector = launch(UnconfinedTestDispatcher(testScheduler)) { viewModel.state.collect {} }
 
-        assertEquals(listOf("report.pdf"), viewModel.state.value.items.map { it.ref.displayName })
+        assertEquals(setOf("photo.jpg", "report.pdf"), viewModel.state.value.items.map { it.ref.displayName }.toSet())
         viewModel.onFilterSelected(FileFilter.Images)
         assertEquals(listOf("photo.jpg"), viewModel.state.value.items.map { it.ref.displayName })
         collector.cancel()

@@ -69,7 +69,7 @@ internal class AndroidPdfEditor(context: Context, private val ref: DocumentRef, 
                 throw DocumentException(DocumentError.FileAccess("The copy could not be saved there."))
             } catch (e: SecurityException) {
                 discardPartial(target)
-                throw DocumentException(DocumentError.FileAccess("EzFiles doesn't have permission to save there."))
+                throw DocumentException(DocumentError.FileAccess("Xfiles doesn't have permission to save there."))
             }
         }
     }

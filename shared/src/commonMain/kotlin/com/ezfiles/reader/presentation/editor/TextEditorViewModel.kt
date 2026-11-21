@@ -37,7 +37,7 @@ enum class EditorNotice(val message: String, val isError: Boolean = true) {
     Saved("Saved", isError = false),
     TooLong("That would make the text longer than this editor can handle, so it wasn't added."),
     CannotEncode("This text has characters this file's encoding can't store, so nothing was saved."),
-    WriteAccessLost("EzFiles can't write to this file any more. It wasn't changed. Use Save As to keep your text."),
+    WriteAccessLost("Xfiles can't write to this file any more. It wasn't changed. Use Save As to keep your text."),
     CheckFailed("Couldn't check the file before saving, so it wasn't changed. Try again or use Save As."),
     WriteFailedUnchanged("Couldn't save. The file is unchanged and your text is still here."),
     WritePartial("Saving stopped part way, so the file may be incomplete. Your text is still here: try again or use Save As."),
@@ -389,7 +389,7 @@ class TextEditorViewModel(
 
     private fun tooLarge(size: Long) = EditorPhase.Refused(
         "This file is too large to edit",
-        "It is ${formatBytes(size)}, and EzFiles can edit text files up to ${formatBytes(MAX_EDITABLE_BYTES.toLong())} " +
+        "It is ${formatBytes(size)}, and Xfiles can edit text files up to ${formatBytes(MAX_EDITABLE_BYTES.toLong())} " +
             "so that typing stays responsive. You can still read it.",
     )
 
@@ -400,7 +400,7 @@ class TextEditorViewModel(
         )
         TextRefusal.NotText -> EditorPhase.Refused(
             "This file can't be edited safely",
-            "It contains binary data or an encoding EzFiles can't edit, so saving it could damage it. It wasn't changed.",
+            "It contains binary data or an encoding Xfiles can't edit, so saving it could damage it. It wasn't changed.",
         )
         TextRefusal.MixedLineEndings -> EditorPhase.Refused(
             "This file can't be edited safely",
@@ -408,7 +408,7 @@ class TextEditorViewModel(
         )
         TextRefusal.NotReproducible -> EditorPhase.Refused(
             "This file can't be edited safely",
-            "EzFiles couldn't reproduce it exactly, so saving it could damage it. It wasn't changed.",
+            "Xfiles couldn't reproduce it exactly, so saving it could damage it. It wasn't changed.",
         )
     }
 

@@ -294,7 +294,7 @@ internal fun CameraPanel(
         ) {
             Icon(ScanIcons.Camera, null, tint = EzColors.Primary, modifier = Modifier.size(48.dp))
             Text(
-                if (access.status == CameraStatus.NotAsked) "Waiting for camera permission." else "EzFiles doesn't have permission to use the camera.",
+                if (access.status == CameraStatus.NotAsked) "Waiting for camera permission." else "Xfiles doesn't have permission to use the camera.",
                 style = MaterialTheme.typography.titleMedium,
                 color = EzColors.Text,
                 textAlign = TextAlign.Center,

@@ -14,7 +14,7 @@ interface DocumentDelivery {
     /** PDF, supported pictures and plain-text sources; rich documents need an explicit export first. */
     fun canPrint(ref: DocumentRef): Boolean
 
-    suspend fun shareText(text: String, title: String = "EzFiles text")
+    suspend fun shareText(text: String, title: String = "Xfiles text")
 }
 
 @Composable

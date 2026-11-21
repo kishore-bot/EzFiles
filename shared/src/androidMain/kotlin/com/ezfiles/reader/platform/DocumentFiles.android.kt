@@ -62,7 +62,7 @@ internal class AndroidDocumentFiles(context: Context) : DocumentFiles {
     } catch (e: IOException) {
         throw DocumentException(DocumentError.FileAccess(e.message ?: "The file could not be accessed."))
     } catch (e: SecurityException) {
-        throw DocumentException(DocumentError.FileAccess("EzFiles no longer has access to this file."))
+        throw DocumentException(DocumentError.FileAccess("Xfiles no longer has access to this file."))
     }
 }
 

@@ -100,6 +100,7 @@ class FilySession(
         tools.question = request
         val state = FilyTurn(FilyRole.User, FilyPrompt.appState(access.enabled.value, access.contentAccess.value, today(), screen))
         val exchange = mutableListOf(FilyTurn(FilyRole.User, request))
+        val evidence = StringBuilder()
         repeat(MAX_TOOL_STEPS + 1) { step ->
             val earlier = history.takeLast(MAX_HISTORY_EXCHANGES).flatten()
             val raw = complete(FilyPrompt.render(system, listOf(state) + earlier + exchange), grammar).trim()
@@ -108,10 +109,14 @@ class FilySession(
             val toolName = response.toolName
             if (response.kind != "tool" || toolName == null || step == MAX_TOOL_STEPS) {
                 remember(exchange)
-                return if (response.kind == "tool") "I couldn't finish that. Try asking another way." else spokenTextFor(response)
+                if (response.kind == "tool") return "I couldn't finish that. Try asking another way."
+                val spoken = spokenTextFor(response)
+                // Answers about file content must come from the text the tools returned.
+                return if (response.kind == "reply" && evidence.isNotEmpty()) Grounding.check(spoken, evidence.toString()) else spoken
             }
             val result = if (toolName in toolNames) tools.execute(toolName, withOpenFile(response.toolArgs, screen)) else UNOFFERED_TOOL
             log("Tool $toolName -> ${result.take(300)}")
+            if (toolName in Grounding.CONTENT_TOOLS) evidence.append(Grounding.evidenceOf(result)).append('\n')
             exchange += FilyTurn(FilyRole.Tool, result)
             // Action results get a fixed, accurate sentence; only content answers go back to the model.
             val parsed = runCatching { Json.parseToJsonElement(result).jsonObject }.getOrNull()
@@ -274,7 +279,7 @@ class FilySession(
         const val MAX_HISTORY_EXCHANGES = 2
         const val UNOFFERED_TOOL = """{"status":"failed","reason":"unsupported_tool"}"""
         const val MAX_FILE_HINTS = 80
-        const val OFF_REPLY = "Fily is turned off. Switch on \"Fily and assistants\" in About EzFiles to use me."
+        const val OFF_REPLY = "Fily is turned off. Switch on \"Fily and assistants\" in About Xfiles to use me."
         val COMMAND_HINTS = listOf(
             "Fily", "next page", "previous page", "go to page", "zoom in", "zoom out", "scroll down", "scroll up",
             "select cell", "next sheet", "next photo", "rotate", "play", "pause", "open", "find", "resume", "CV",

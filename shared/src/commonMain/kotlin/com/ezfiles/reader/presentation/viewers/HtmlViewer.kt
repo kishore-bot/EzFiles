@@ -181,8 +181,8 @@ private fun FolderNote(kind: PageKind, onAllow: () -> Unit) {
 }
 
 private const val PAGES_FALLBACK_NOTE = "This document couldn't be laid out as pages, so only its text is shown."
-private const val OFFLINE_NOTE = "Online content doesn't load: EzFiles works offline"
-private const val REFUSED_LINK = "EzFiles doesn't open this kind of link."
+private const val OFFLINE_NOTE = "Online content doesn't load: Xfiles works offline"
+private const val REFUSED_LINK = "Xfiles doesn't open this kind of link."
 private const val NO_APP_FOR_LINK = "No app on this device can open this link."
 
 internal val HtmlPageFailure.message: String

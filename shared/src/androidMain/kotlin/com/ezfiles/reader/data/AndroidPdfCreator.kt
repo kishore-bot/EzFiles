@@ -351,7 +351,7 @@ internal class AndroidPdfCreator(context: Context) : PdfCreator {
     } catch (e: IOException) {
         throw DocumentException(DocumentError.FileAccess(e.message ?: "The file could not be accessed."))
     } catch (_: SecurityException) {
-        throw DocumentException(DocumentError.FileAccess("EzFiles no longer has access to this file."))
+        throw DocumentException(DocumentError.FileAccess("Xfiles no longer has access to this file."))
     } catch (_: OutOfMemoryError) {
         throw DocumentException(DocumentError.LimitExceeded("This is too large to process on this device."))
     }

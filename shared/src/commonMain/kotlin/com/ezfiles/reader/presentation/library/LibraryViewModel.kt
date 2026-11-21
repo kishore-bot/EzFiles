@@ -130,10 +130,8 @@ class LibraryViewModel(
     private val listState = combine(inputs, recentItems, deviceItems, addFolderFailed) { input, historyList, filesList, failed ->
         val history = historyList.items
         val files = filesList.items
-        // Photos would drown out documents, so they appear under Images only.
-        val byType = { item: LibraryItem ->
-            if (input.filter == FileFilter.All) item.type != FileType.Image else input.filter in item.type.filters
-        }
+        // All lists every file type, images included.
+        val byType = { item: LibraryItem -> input.filter == FileFilter.All || input.filter in item.type.filters }
         val home = input.filter == FileFilter.All && input.query.isEmpty() && device.supportsFolders
         // Without folders, categories and search still work over the history.
         val source = when {
@@ -167,7 +165,7 @@ class LibraryViewModel(
         if (!list.searchesContent || list.query.length < MIN_CONTENT_QUERY) return@combine list
         val (asked, hits) = results
         val listed = list.items.mapTo(HashSet()) { it.ref.identity }
-        val typeShown = { type: FileType -> if (list.filter == FileFilter.All) type != FileType.Image else list.filter in type.filters }
+        val typeShown = { type: FileType -> list.filter == FileFilter.All || list.filter in type.filters }
         list.copy(
             // Results for an older query stay until the new ones arrive, so the list doesn't flicker while typing.
             contentHits = if (asked.isEmpty()) emptyList() else hits.asSequence()

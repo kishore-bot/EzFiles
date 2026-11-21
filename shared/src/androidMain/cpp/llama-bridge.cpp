@@ -14,7 +14,8 @@
 #define LOGI(...) __android_log_print(ANDROID_LOG_INFO, TAG, __VA_ARGS__)
 #define LOGE(...) __android_log_print(ANDROID_LOG_ERROR, TAG, __VA_ARGS__)
 
-static const int N_CTX = 2048;
+// 4096: room for longer document excerpts. LFM2 has few attention layers, so the extra KV cache is small.
+static const int N_CTX = 4096;
 
 static llama_model * model = nullptr;
 static bool model_on_gpu = false;

@@ -851,7 +851,7 @@ class ReaderViewModelTest {
 
     @Test
     fun a_lost_file_from_a_bookmark_offers_to_remove_it() = runTest {
-        val lost = DocumentError.FileAccess("EzFiles no longer has access to this file.")
+        val lost = DocumentError.FileAccess("Xfiles no longer has access to this file.")
         val viewModel = ReaderViewModel(DocumentReadingService(FakeReader { throw DocumentException(lost) }))
         val at = BookmarkLocation.Page(3)
         viewModel.onAction(ReaderAction.DocumentPicked(ref, at = at))

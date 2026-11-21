@@ -47,7 +47,7 @@ internal class AndroidDocumentOutputs(context: Context) : DocumentOutputs {
         } catch (e: IOException) {
             throw DocumentException(DocumentError.FileAccess(e.message ?: "The file could not be created."))
         } catch (_: RuntimeException) {
-            throw DocumentException(DocumentError.FileAccess("EzFiles can't create files in this folder."))
+            throw DocumentException(DocumentError.FileAccess("Xfiles can't create files in this folder."))
         }
         created?.toString() ?: throw DocumentException(DocumentError.FileAccess("The app that provides this folder did not create the file."))
     }

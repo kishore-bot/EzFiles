@@ -346,7 +346,7 @@ fun App(
             }
             var tool by rememberSaveable { mutableStateOf<CreateTool?>(null) }
             var createSheet by rememberSaveable { mutableStateOf(false) }
-            // About agent: the About and Why EzFiles pages, over the library like a tool.
+            // About agent: the About and Why Xfiles pages, over the library like a tool.
             var aboutRoute by rememberSaveable { mutableStateOf<AboutRoute?>(null) }
             val delivery = rememberDocumentDelivery()
             var assistantReview by remember { mutableStateOf<AssistantDestination?>(null) }

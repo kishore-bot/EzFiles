@@ -538,6 +538,6 @@ class PdfToolFlow(
 
     private companion object {
         const val UNEXPECTED = "Something went wrong with this file."
-        const val LOST_WORK = "EzFiles was closed while that dialog was open, so nothing was saved. Please try again."
+        const val LOST_WORK = "Xfiles was closed while that dialog was open, so nothing was saved. Please try again."
     }
 }

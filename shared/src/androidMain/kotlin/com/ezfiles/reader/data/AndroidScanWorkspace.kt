@@ -301,7 +301,7 @@ internal inline fun <T> guarded(block: () -> T): T = try {
 } catch (e: IOException) {
     throw DocumentException(DocumentError.FileAccess(e.message ?: "The picture couldn't be read or saved."))
 } catch (_: SecurityException) {
-    throw DocumentException(DocumentError.FileAccess("EzFiles no longer has access to this picture."))
+    throw DocumentException(DocumentError.FileAccess("Xfiles no longer has access to this picture."))
 }
 
 /** The smallest power-of-two reduction that fits [maxSide], which is what the decoder supports. */

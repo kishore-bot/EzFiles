@@ -305,7 +305,8 @@ class ToolExecutor(
 
     private companion object {
         const val RESULT_LIMIT = 8
-        const val MAX_EXCERPT_CHARS = 1500
+        // Fits the 4096-token context with the prompt, tools and history (about 4 chars per token).
+        const val MAX_EXCERPT_CHARS = 3000
     }
 }
 

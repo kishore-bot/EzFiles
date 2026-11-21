@@ -62,7 +62,7 @@ class CrashReportingTest {
         val text = CrashReportFormatter.format(device, "2026-11-11T10:00:00Z", "main", "reader (Pdf)", trace)
         assertEquals(
             """
-            EzFiles crash report
+            Xfiles crash report
             App: 1.2.3 (42)
             System: Android 15 (API 35)
             Device: Google Pixel 8
@@ -91,7 +91,7 @@ class CrashReportingTest {
         val trace = (1..5000).joinToString("\n") { "\tat com.ezfiles.Frame$it.call(Frame.kt:$it)" }
         val text = CrashReportFormatter.format(device, "t", "main", null, trace, maxBytes = 4096)
         assertTrue(text.encodeToByteArray().size <= 4096, "size ${text.encodeToByteArray().size}")
-        assertTrue(text.startsWith("EzFiles crash report"))
+        assertTrue(text.startsWith("Xfiles crash report"))
         assertTrue(text.endsWith("… (report shortened)"), text.takeLast(80))
         assertTrue(text.lines().dropLast(1).last().endsWith(")"), "cut mid-line")
     }
@@ -144,8 +144,8 @@ class CrashReportingTest {
     @Test
     fun feedback_template_has_only_version_and_device() {
         val body = FeedbackTemplate.body(device)
-        assertEquals("\n\n--\nEzFiles 1.2.3 (42)\nAndroid 15 (API 35)\nGoogle Pixel 8", body)
-        assertEquals("EzFiles crash report 1.2.3", CrashReportFormatter.subject("1.2.3"))
+        assertEquals("\n\n--\nXfiles 1.2.3 (42)\nAndroid 15 (API 35)\nGoogle Pixel 8", body)
+        assertEquals("Xfiles crash report 1.2.3", CrashReportFormatter.subject("1.2.3"))
     }
 
     @Test
@@ -170,7 +170,7 @@ class CrashReportingTest {
 
     @Test
     fun vision_text_keeps_its_shape() {
-        assertEquals(VisionBlock.Title("Why EzFiles Exists"), VisionText.first())
+        assertEquals(VisionBlock.Title("Why Xfiles Exists"), VisionText.first())
         assertEquals(3, VisionText.count { it is VisionBlock.PullQuote })
         assertEquals(5, VisionText.filterIsInstance<VisionBlock.Beliefs>().single().items.size)
         assertEquals(VisionBlock.SignOff("Built for people. Shared with everyone."), VisionText.last())

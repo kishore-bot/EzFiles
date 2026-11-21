@@ -101,7 +101,7 @@ object IosAssistantBridge {
     private fun entity(document: AssistantDocument) = IosAssistantDocument(document.id, document.name)
 
     private fun failureMessage(failure: Exception): String = when (failure) {
-        is AssistantAccessDenied -> "Unlock the device and enable Assistant access in EzFiles Info to use Siri."
-        else -> "This document is unavailable. Open it again in EzFiles and retry."
+        is AssistantAccessDenied -> "Unlock the device and enable Assistant access in Xfiles Info to use Siri."
+        else -> "This document is unavailable. Open it again in Xfiles and retry."
     }
 }

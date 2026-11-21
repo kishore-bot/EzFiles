@@ -104,8 +104,8 @@ internal object FilyReplies {
     private fun count(n: Int, more: Boolean) = if (more) "at least $n files" else "$n files"
 
     private fun failure(tool: String, args: JsonObject?, reason: String?): String? = when (reason) {
-        "access_off" -> "Fily's file access is off. You can turn it on in EzFiles Info."
-        "content_restricted" -> "I'm not allowed to read inside files. You can allow it in EzFiles Info."
+        "access_off" -> "Fily's file access is off. You can turn it on in Xfiles Info."
+        "content_restricted" -> "I'm not allowed to read inside files. You can allow it in Xfiles Info."
         "not_available" -> "I couldn't find that file."
         "no_document" -> "Open a file first."
         "unsupported_here" -> when (args.string("operation")) {

@@ -55,7 +55,7 @@ fun androidAppDependencies(
     applicationScope: CoroutineScope,
     assistantAccess: AssistantAccess = androidAssistantAccess(context),
 ): AppDependencies {
-    android.os.Trace.beginSection("EzFiles.dependencies")
+    android.os.Trace.beginSection("Xfiles.dependencies")
     return try {
         createAndroidAppDependencies(context, applicationScope, assistantAccess)
     } finally {

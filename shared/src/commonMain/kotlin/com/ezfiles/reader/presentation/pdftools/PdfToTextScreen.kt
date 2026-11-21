@@ -263,7 +263,7 @@ private fun collectorNote(collector: PdfTextCollector?, pageCount: Int): String?
     collector ?: return null
     val cut = collector.cutAtPage
     return when {
-        cut != null -> "This is the first ${MAX_EXTRACTED_CHARS / 1000},000 characters, the most EzFiles holds at once. It stops on page ${cut + 1} of $pageCount."
+        cut != null -> "This is the first ${MAX_EXTRACTED_CHARS / 1000},000 characters, the most Xfiles holds at once. It stops on page ${cut + 1} of $pageCount."
         collector.blankPages > 0 -> "${collector.blankPages} of $pageCount pages had no text, so they may be scans. Nothing was read from their pictures."
         else -> null
     }

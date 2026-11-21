@@ -284,7 +284,7 @@ private class LockedWebView private constructor(
             view.loadDataWithBaseURL(url, page, "text/html", "UTF-8", null)
             holder
         } catch (e: RuntimeException) {
-            android.util.Log.w("EzFiles", "No web view", e)
+            android.util.Log.w("Xfiles", "No web view", e)
             null
         }
     }

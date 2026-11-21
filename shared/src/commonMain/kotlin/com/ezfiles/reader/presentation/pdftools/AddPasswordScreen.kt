@@ -66,7 +66,7 @@ fun AddPasswordScreen(onClose: () -> Unit, onOpen: (DocumentRef) -> Unit) {
         if (pdf != null) {
             PdfToolForm(pdf, pickPdf) {
                 PdfToolNote(
-                    "A forgotten password can't be recovered. Nobody can open the protected copy without it, and that includes EzFiles. Keep it somewhere safe.",
+                    "A forgotten password can't be recovered. Nobody can open the protected copy without it, and that includes Xfiles. Keep it somewhere safe.",
                     warning = true,
                 )
                 if (pdf.info.encrypted) PdfToolNote("This PDF is already protected. The new password replaces its current one in the copy.")

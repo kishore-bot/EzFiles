@@ -96,8 +96,8 @@ internal fun LinkedMediaBar(page: DocumentRef, media: List<LinkedMedia>) {
             title = { Text("Play “${item.name}”?") },
             text = {
                 Text(
-                    "This page plays a separate file, “${item.name}”. EzFiles only opens files you choose, " +
-                        "so pick it to play it here. Adding the page's folder to your library lets EzFiles find it next time.",
+                    "This page plays a separate file, “${item.name}”. Xfiles only opens files you choose, " +
+                        "so pick it to play it here. Adding the page's folder to your library lets Xfiles find it next time.",
                 )
             },
             confirmButton = {

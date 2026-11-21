@@ -205,7 +205,7 @@ class AndroidAppInfo(context: Context) : AppInfo {
 
 /**
  * The share sheet with [text], addressed to [CRASH_REPORT_EMAIL] for mail apps.
- * EzFiles accepts shared text itself, so it is left out of the list.
+ * Xfiles accepts shared text itself, so it is left out of the list.
  */
 private fun shareText(context: Context, subject: String, text: String, title: String): Boolean {
     val send = Intent(Intent.ACTION_SEND)

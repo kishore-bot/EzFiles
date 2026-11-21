@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <string name="app_name">EzFiles</string>
-    <string name="share_needs_file">EzFiles opens files. This share did not include a file it can open.</string>
+    <string name="app_name">Xfiles</string>
+    <string name="share_needs_file">Xfiles opens files. This share did not include a file it can open.</string>
 </resources>

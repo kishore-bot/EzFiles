@@ -93,7 +93,7 @@ object CrashReportFormatter {
         maxBytes: Int = MAX_CRASH_REPORT_BYTES,
     ): String {
         val header = buildString {
-            appendLine("EzFiles crash report")
+            appendLine("Xfiles crash report")
             appendLine("App: ${device.versionName} (${device.versionCode})")
             appendLine("System: ${device.system}")
             appendLine("Device: ${device.model}")
@@ -148,18 +148,18 @@ object CrashReportFormatter {
     }
 
     /** Subject line of a crash report message. */
-    fun subject(versionName: String): String = "EzFiles crash report $versionName"
+    fun subject(versionName: String): String = "Xfiles crash report $versionName"
 }
 
 /** The blank feedback message: the app version and device, nothing else. */
 object FeedbackTemplate {
-    fun subject(versionName: String): String = "EzFiles feedback $versionName"
+    fun subject(versionName: String): String = "Xfiles feedback $versionName"
 
     fun body(device: DeviceDescription): String = buildString {
         appendLine()
         appendLine()
         appendLine("--")
-        appendLine("EzFiles ${device.versionName} (${device.versionCode})")
+        appendLine("Xfiles ${device.versionName} (${device.versionCode})")
         appendLine(device.system)
         append(device.model)
     }

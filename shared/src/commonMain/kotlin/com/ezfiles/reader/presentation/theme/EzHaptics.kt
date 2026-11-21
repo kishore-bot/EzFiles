@@ -14,7 +14,7 @@ import kotlin.time.TimeSource
 val LocalHapticsEnabled = staticCompositionLocalOf { true }
 
 /**
- * The few moments EzFiles answers with a light touch, all using the system's
+ * The few moments Xfiles answers with a light touch, all using the system's
  * own crisp, short effects (no custom buzzes, so no vibration permission).
  *
  * One cue marks an intentional activation, changed choice, toggle, threshold

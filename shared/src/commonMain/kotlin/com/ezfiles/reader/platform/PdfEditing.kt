@@ -33,16 +33,16 @@ sealed interface PdfSaveBlock {
     val message: String
 
     data object Encrypted : PdfSaveBlock {
-        override val message = "This PDF is password-protected, so EzFiles can't save annotations into it."
+        override val message = "This PDF is password-protected, so Xfiles can't save annotations into it."
     }
 
     data class Unreadable(val detail: String) : PdfSaveBlock {
-        override val message = "EzFiles can't safely save annotations into this PDF: $detail."
+        override val message = "Xfiles can't safely save annotations into this PDF: $detail."
     }
 
     /** The engine and the page renderer disagree on the pages, so a note could land on the wrong one. */
     data object PageMismatch : PdfSaveBlock {
-        override val message = "EzFiles can't safely save annotations into this PDF: its page structure is unusual."
+        override val message = "Xfiles can't safely save annotations into this PDF: its page structure is unusual."
     }
 }
 

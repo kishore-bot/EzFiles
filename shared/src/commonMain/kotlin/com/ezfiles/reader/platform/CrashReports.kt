@@ -34,7 +34,7 @@ interface AppInfo {
     fun sendFeedback(): Boolean
 
     /**
-     * Opens an https or mailto [url] in the system browser or mail app; EzFiles
+     * Opens an https or mailto [url] in the system browser or mail app; Xfiles
      * does not load that link itself. `false` for any other scheme or when nothing can open it.
      */
     fun openLink(url: String): Boolean

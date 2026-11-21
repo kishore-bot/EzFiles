@@ -63,7 +63,7 @@ internal class ChosenFolderDocuments(
     init {
         if (_folders.value.isNotEmpty()) cacheLoad = scope.launch {
             try {
-                val cached = try { traceAppWork("EzFiles.libraryCache") { loadCache() } } catch (cancelled: CancellationException) { throw cancelled }
+                val cached = try { traceAppWork("Xfiles.libraryCache") { loadCache() } } catch (cancelled: CancellationException) { throw cancelled }
                     catch (_: Exception) { emptyMap() }
                 lock.withLock {
                     // A fresh scan always wins, including an empty/unavailable result.

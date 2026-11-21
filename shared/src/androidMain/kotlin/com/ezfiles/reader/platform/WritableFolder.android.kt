@@ -35,7 +35,7 @@ private class AndroidWritableFolders(private val app: Context) : WritableFolders
             DocumentsContract.createDocument(app.contentResolver, folderDocument(folder), mimeType, name)?.toString()
                 ?: throw DocumentException(DocumentError.FileAccess("That folder didn't accept a new file."))
         } catch (_: SecurityException) {
-            throw DocumentException(DocumentError.FileAccess("EzFiles doesn't have permission to save in that folder."))
+            throw DocumentException(DocumentError.FileAccess("Xfiles doesn't have permission to save in that folder."))
         } catch (_: FileNotFoundException) {
             throw DocumentException(DocumentError.FileAccess("That folder is no longer available."))
         } catch (_: IllegalArgumentException) {

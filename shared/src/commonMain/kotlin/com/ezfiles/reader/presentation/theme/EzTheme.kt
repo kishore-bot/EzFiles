@@ -133,7 +133,7 @@ val DarkPalette = EzPalette(
 val LocalEzPalette = staticCompositionLocalOf { LightPalette }
 
 /**
- * Design tokens of the EzFiles design system (Material 3 Expressive + glass).
+ * Design tokens of the Xfiles design system (Material 3 Expressive + glass).
  * The brand colours are the same in both themes; the rest follow the theme,
  * so they're read inside composition. Content drawn on a document's white
  * page uses [EzPaper] instead, which never changes.

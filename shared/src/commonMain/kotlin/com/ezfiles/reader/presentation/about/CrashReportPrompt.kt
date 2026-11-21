@@ -60,7 +60,7 @@ fun CrashReportPrompt() {
     }
     EzDialog(
         onDismissRequest = { report = null }, // Asked again next launch.
-        title = { Text("EzFiles closed unexpectedly") },
+        title = { Text("Xfiles closed unexpectedly") },
         scrollBody = false,
         text = {
             Column(Modifier.verticalScroll(rememberScrollState())) {

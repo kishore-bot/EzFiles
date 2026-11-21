@@ -85,7 +85,7 @@ internal class AndroidDocumentAccess private constructor(context: Context) : Doc
     } catch (e: FileNotFoundException) {
         throw accessError("The file is no longer available.")
     } catch (e: SecurityException) {
-        throw accessError("EzFiles doesn't have permission to read this file.")
+        throw accessError("Xfiles doesn't have permission to read this file.")
     }
 
     private fun accessError(detail: String) = DocumentException(DocumentError.FileAccess(detail))

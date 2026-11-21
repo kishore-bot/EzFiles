@@ -63,7 +63,7 @@ struct EzFilesShortcuts: AppShortcutsProvider {
 
 struct FindEzFilesDocument: AppIntent {
     static let title: LocalizedStringResource = "Find a document"
-    static let description = IntentDescription("Finds up to 20 previously opened documents by filename when Assistant access is enabled in EzFiles Info.")
+    static let description = IntentDescription("Finds up to 20 previously opened documents by filename when Assistant access is enabled in Xfiles Info.")
     static let authenticationPolicy: IntentAuthenticationPolicy = .requiresLocalDeviceAuthentication
 
     @Parameter(title: "Document name")
@@ -77,14 +77,14 @@ struct FindEzFilesDocument: AppIntent {
 
 struct OpenRecentEzFilesDocument: AppIntent {
     static let title: LocalizedStringResource = "Open recent document"
-    static let description = IntentDescription("Opens the most recently used, still accessible document in EzFiles.")
+    static let description = IntentDescription("Opens the most recently used, still accessible document in Xfiles.")
     static let openAppWhenRun = true
     static let authenticationPolicy: IntentAuthenticationPolicy = .requiresLocalDeviceAuthentication
 
     @MainActor
     func perform() async throws -> some IntentResult {
         guard let document = try await AssistantClient.documents(recent: true).first else {
-            throw AssistantFailure.unavailable("Open a document in EzFiles first.")
+            throw AssistantFailure.unavailable("Open a document in Xfiles first.")
         }
         try await AssistantClient.perform(documentID: document.id, action: "open")
         return .result()
@@ -93,7 +93,7 @@ struct OpenRecentEzFilesDocument: AppIntent {
 
 struct ShareEzFilesDocument: AppIntent {
     static let title: LocalizedStringResource = "Share a document"
-    static let description = IntentDescription("Opens EzFiles to review the selected original and choose a recipient in the system share sheet. It does not send a file automatically.")
+    static let description = IntentDescription("Opens Xfiles to review the selected original and choose a recipient in the system share sheet. It does not send a file automatically.")
     static let openAppWhenRun = true
     static let authenticationPolicy: IntentAuthenticationPolicy = .requiresLocalDeviceAuthentication
 
@@ -109,7 +109,7 @@ struct ShareEzFilesDocument: AppIntent {
 
 struct PrintEzFilesDocument: AppIntent {
     static let title: LocalizedStringResource = "Print a document"
-    static let description = IntentDescription("Opens EzFiles to review a printable PDF, image or plain text document, then opens system print options. It does not print automatically.")
+    static let description = IntentDescription("Opens Xfiles to review a printable PDF, image or plain text document, then opens system print options. It does not print automatically.")
     static let openAppWhenRun = true
     static let authenticationPolicy: IntentAuthenticationPolicy = .requiresLocalDeviceAuthentication
 

@@ -858,7 +858,7 @@ private fun ReaderUiState.title(): String = when (this) {
     is ReaderUiState.Failed -> name
     is ReaderUiState.Cancelled -> name
     is ReaderUiState.Playing -> ref.displayName
-    else -> "EzFiles"
+    else -> "Xfiles"
 }
 
 fun DocumentError.title(): String = when (this) {
@@ -954,7 +954,7 @@ private fun Message(title: String, body: String?, onAction: (ReaderAction) -> Un
             val bookmarks = LocalBookmarks.current
             val scope = rememberCoroutineScope()
             Text(
-                "This file was opened from a bookmark. Choose the file again to give EzFiles access, or remove the bookmark.",
+                "This file was opened from a bookmark. Choose the file again to give Xfiles access, or remove the bookmark.",
                 style = MaterialTheme.typography.bodyMedium,
                 color = EzColors.TextSecondary,
                 textAlign = TextAlign.Center,
